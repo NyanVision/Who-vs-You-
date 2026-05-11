@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Who vs You? – eTournament</title>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <!-- PocketBase SDK -->
+  <script src="https://unpkg.com/pocketbase/dist/pocketbase.umd.js"></script>
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ═══ LOADING SCREEN ═══ -->
+<div id="loading-screen">
+  <img class="loading-logo-img tournament-logo" src="assets/logos/tournament-logo.png" alt="Tournament Logo">
+  <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
+  <div class="loading-text">Loading Tournament Data…</div>
+</div>
+
+<!-- ═══ BACKGROUND LAYERS ═══ -->
+<div class="bg-layer bg-radial"></div>
+<div class="bg-layer bg-grid"></div>
+<div class="bg-layer bg-scan"></div>
+<div class="bg-layer bg-vignette"></div>
+<div class="bg-layer bg-particles" id="particles"></div>
+
+<!-- ═══ TOAST CONTAINER ═══ -->
+<div id="toast-container"></div>
+
+<!-- ═══ SIDEBAR TOGGLE (mobile) ═══ -->
+<button class="sb-toggle" id="sb-toggle" onclick="toggleSidebar()">☰</button>
+
+<!-- ═══ HEADER ═══ -->
+<div id="app-header">
+  <div class="hero">
+    <div class="cbr cbr-tl"></div>
+    <div class="cbr cbr-tr"></div>
+    <div class="cbr cbr-bl"></div>
+    <div class="cbr cbr-br"></div>
+
+    <div class="logo-wrap">
+      <img id="logo-img" class="tournament-logo" src="assets/logos/tournament-logo.png" alt="Tournament Logo"
+        onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='block'">
+      <div id="logo-fallback">WVY</div>
+    </div>
+
+    <div class="site-title" id="site-title">Who vs You?</div>
+    <div class="title-slash"></div>
+    <div class="season-badge" id="season-badge">Season 5</div>
+
+    <div class="top-nav">
+      <img class="nav-tournament-logo tournament-logo" src="assets/logos/tournament-logo.png" alt="Tournament Logo">
+      <button class="nav-btn active" id="nav-public" onclick="showView('public')">🏆 Tournament</button>
+      <button class="nav-btn gold-btn" id="nav-admin" onclick="toggleAdmin()">⚙ Admin</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PUBLIC VIEW
+═══════════════════════════════════════════ -->
+<div id="view-public" class="section visible fade-in">
+  <div style="max-width:1300px;margin:0 auto;padding:24px 16px 80px;position:relative;z-index:1;">
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <div id="status-dot" class="status-dot"></div>
+      <span id="status-text">Loading…</span>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+        <label class="form-label" style="margin:0">Season</label>
+        <select class="season-select" id="public-season-select" onchange="loadSeasonData(this.value)">
+          <option value="current">Current</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Champion Display (shown when final is played) -->
+    <div id="champion-display" style="display:none;margin-bottom:20px;"></div>
+
+    <!-- Stage Tabs -->
+    <div id="stage-tabs" class="stage-tabs" style="display:none">
+      <button class="stage-tab active" id="tab-group" onclick="showStage('group')">Group Stage</button>
+      <button class="stage-tab" id="tab-ko" onclick="showStage('ko')">Knockout</button>
+      <button class="stage-tab" id="tab-history" onclick="showStage('history')">Season History</button>
+    </div>
+
+    <!-- Group Stage -->
+    <div id="stage-group" class="fade-in">
+      <div id="groups-container">
+        <div class="empty-state">
+          <span class="ei">🏟️</span>
+          <h3>No Tournament Yet</h3>
+          <p>Admin needs to create a tournament.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Knockout Stage -->
+    <div id="stage-ko" style="display:none" class="fade-in">
+      <div class="ko-tabs" id="ko-round-tabs"></div>
+      <div id="ko-matches-container"></div>
+      <div class="card" style="margin-top:18px">
+        <div class="card-title">Bracket <span class="acc">Overview</span></div>
+        <div class="bracket-wrap"><div class="bracket" id="bracket-display"></div></div>
+      </div>
+    </div>
+
+    <!-- Season History -->
+    <div id="stage-history" style="display:none" class="fade-in">
+      <div id="history-container">
+        <div class="empty-state">
+          <span class="ei">📚</span>
+          <h3>No History Yet</h3>
+          <p>Previous seasons will appear here.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     ADMIN VIEW
+═══════════════════════════════════════════ -->
+<div id="view-admin" class="section">
+
+  <!-- Admin Login -->
+  <div id="admin-login" style="max-width:400px;margin:50px auto;padding:20px;position:relative;z-index:1;">
+    <div class="card">
+      <div class="card-title"><span class="acc">Admin</span> Login</div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" id="admin-password" class="form-input" placeholder="Enter password"
+          onkeydown="if(event.key==='Enter')adminLogin()">
+      </div>
+      <button class="btn btn-red" onclick="adminLogin()" style="width:100%;justify-content:center">🔓 Login</button>
+    </div>
+  </div>
+
+  <!-- Admin Panel -->
+  <div id="admin-panel" style="display:none">
+    <div class="admin-layout">
+
+      <!-- ─── SIDEBAR ─── -->
+      <div class="sidebar" id="sidebar">
+        <div class="sidebar-logo">
+          <div class="sidebar-logo-txt"><img class="sidebar-tournament-logo tournament-logo" src="assets/logos/tournament-logo.png" alt="Tournament Logo"><span>WVY</span> Admin</div>
+          <div class="sidebar-season" id="sb-season-txt">Season 5</div>
+        </div>
+
+        <div class="sb-section">Main</div>
+        <div class="sb-item active" data-section="dashboard" onclick="switchSection('dashboard')"><span class="sb-icon">📊</span>Dashboard</div>
+        <div class="sb-item" data-section="tournament" onclick="switchSection('tournament')"><span class="sb-icon">🏆</span>Tournament</div>
+        <div class="sb-item" data-section="players" onclick="switchSection('players')"><span class="sb-icon">👥</span>Players</div>
+
+        <div class="sb-section">Match Management</div>
+        <div class="sb-item" data-section="groups" onclick="switchSection('groups')"><span class="sb-icon">🗂️</span>Groups</div>
+        <div class="sb-item" data-section="fixtures" onclick="switchSection('fixtures')"><span class="sb-icon">📅</span>Fixtures</div>
+        <div class="sb-item" data-section="results" onclick="switchSection('results')">
+          <span class="sb-icon">✅</span>Submit Results
+          <span id="sb-badge-results" class="sb-badge" style="display:none">0</span>
+        </div>
+
+        <div class="sb-section">Knockout</div>
+        <div class="sb-item" data-section="knockout" onclick="switchSection('knockout')"><span class="sb-icon">⚔️</span>Knockout Bracket</div>
+
+        <div class="sb-section">History & Data</div>
+        <div class="sb-item" data-section="seasons" onclick="switchSection('seasons')"><span class="sb-icon">📚</span>Season History</div>
+        <div class="sb-item" data-section="log" onclick="switchSection('log')"><span class="sb-icon">📋</span>Match Log</div>
+        <div class="sb-item" data-section="settings" onclick="switchSection('settings')"><span class="sb-icon">⚙️</span>Settings</div>
+
+        <div class="sb-section">Danger</div>
+        <div class="sb-item" onclick="openModal('modal-danger')" style="color:var(--red2)"><span class="sb-icon">🗑️</span>Reset / Delete</div>
+      </div>
+
+      <!-- ─── ADMIN CONTENT ─── -->
+      <div class="admin-content">
+
+        <!-- ── DASHBOARD ── -->
+        <div id="section-dashboard" class="admin-panel-section active">
+          <div class="card-title" style="font-family:var(--ff-title);font-size:28px;letter-spacing:.1em;margin-bottom:20px;display:flex;align-items:center;gap:10px;">
+            Dashboard <span class="acc" style="font-size:28px"></span>
+            <span style="flex:1;height:1px;background:linear-gradient(90deg,rgba(204,0,0,.4),transparent);"></span>
+          </div>
+
+          <div class="stats-grid" id="dash-stats">
+            <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-num" id="stat-players">0</div><div class="stat-label">Players</div></div>
+            <div class="stat-card gold"><div class="stat-icon">🏆</div><div class="stat-num" id="stat-groups">0</div><div class="stat-label">Groups</div></div>
+            <div class="stat-card green"><div class="stat-icon">✅</div><div class="stat-num" id="stat-played">0</div><div class="stat-label">Matches Played</div></div>
+            <div class="stat-card blue"><div class="stat-icon">📅</div><div class="stat-num" id="stat-pending">0</div><div class="stat-label">Pending</div></div>
+            <div class="stat-card"><div class="stat-icon">⚔️</div><div class="stat-num" id="stat-ko">0</div><div class="stat-label">KO Matches</div></div>
+            <div class="stat-card gold"><div class="stat-icon">📚</div><div class="stat-num" id="stat-seasons">1</div><div class="stat-label">Seasons</div></div>
+          </div>
+
+          <div class="status-bar" id="admin-status-bar">
+            <div id="admin-status-dot" class="status-dot"></div>
+            <span id="admin-status-text">Loading…</span>
+          </div>
+
+          <div id="pocketbase-config-card" class="card" style="border-color:rgba(196,154,48,.2)">
+            <div class="card-title"><span class="acc">⚡</span> PocketBase Connection</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">PocketBase URL</label>
+                <input type="text" id="pb-url" class="form-input" value="http://127.0.0.1:8090" placeholder="http://127.0.0.1:8090">
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-gold" onclick="connectPocketBase()">⚡ Connect PocketBase</button>
+              <button class="btn btn-ghost btn-sm" onclick="useLocalMode()">📦 Use Local Mode</button>
+            </div>
+            <p style="font-size:11px;color:var(--muted);margin-top:8px">Keep PocketBase running, then connect. Collections used: players, groups, fixtures, knockout.</p>
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="card" style="margin-top:18px">
+            <div class="card-title">Recent <span class="acc">Activity</span></div>
+            <div id="recent-activity">
+              <div class="empty-state" style="padding:30px 20px"><span class="ei" style="font-size:28px">📋</span><p>No recent activity</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── TOURNAMENT SETUP ── -->
+        <div id="section-tournament" class="admin-panel-section">
+          <div class="card">
+            <div class="card-title">🏆 Create / Edit <span class="acc">Tournament</span></div>
+            <div class="form-group">
+              <label class="form-label">Tournament Name</label>
+              <input type="text" id="t-name" class="form-input" value="Who vs You? eTournament">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Season Number</label>
+                <input type="number" id="t-season" class="form-input" value="5" min="1" max="99">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Number of Groups</label>
+                <input type="number" id="t-groups" class="form-input" value="4" min="1" max="8">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Players per Group</label>
+                <input type="number" id="t-ppg" class="form-input" value="4" min="2" max="10">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Players Advancing per Group</label>
+              <div class="radio-group" id="advance-radio">
+                <label class="radio-opt"><input type="radio" name="advance" value="1"> Top 1</label>
+                <label class="radio-opt"><input type="radio" name="advance" value="2" checked> Top 2</label>
+                <label class="radio-opt"><input type="radio" name="advance" value="3"> Top 3</label>
+                <label class="radio-opt"><input type="radio" name="advance" value="4"> Top 4</label>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-red" onclick="createTournament()">🏆 Create Tournament</button>
+              <button class="btn btn-ghost btn-sm" onclick="archiveCurrentSeason()">📚 Archive & New Season</button>
+            </div>
+          </div>
+          <div id="tournament-info-card" style="display:none" class="card">
+            <div class="card-title">Current <span class="acc">Tournament</span></div>
+            <div id="tournament-info-body"></div>
+          </div>
+        </div>
+
+        <!-- ── PLAYERS ── -->
+        <div id="section-players" class="admin-panel-section">
+          <div class="card">
+            <div class="card-title">👥 Manage <span class="acc">Players</span></div>
+            <div class="form-group">
+              <label class="form-label">Add Player</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <input type="text" id="player-name-input" class="form-input" placeholder="Player name"
+                  onkeydown="if(event.key==='Enter')addPlayer()" style="min-width:220px;flex:1">
+                <input type="file" id="player-photo-input" class="form-input" accept="image/*" style="max-width:240px">
+                <button class="btn btn-red" onclick="addPlayer()">Add</button>
+              </div>
+              <p style="font-size:11px;color:var(--muted);margin-top:6px">Player fields: name and photo only.</p>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Bulk Add (one per line)</label>
+              <textarea id="bulk-players" class="form-textarea" placeholder="Player1&#10;Player2&#10;Player3"></textarea>
+              <button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="bulkAddPlayers()">Add All</button>
+            </div>
+            <div class="divider"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <label class="form-label" style="margin:0">Players (<span id="player-count">0</span>)</label>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-red btn-sm" onclick="savePlayers()">💾 Save</button>
+                <button class="btn btn-danger btn-sm" onclick="clearAllPlayers()">🗑️ Clear</button>
+              </div>
+            </div>
+            <div id="player-list" style="display:flex;flex-wrap:wrap;gap:4px;min-height:40px"></div>
+          </div>
+        </div>
+
+        <!-- ── GROUPS ── -->
+        <div id="section-groups" class="admin-panel-section">
+          <div class="card">
+            <div class="card-title">🗂️ Group <span class="acc">Settings</span></div>
+            <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+              <button class="btn btn-gold" onclick="randomizeGroups()">🔀 Randomize Groups</button>
+              <button class="btn btn-ghost btn-sm" onclick="renderGroupSettings()">🔄 Refresh</button>
+            </div>
+            <div id="group-settings-body">
+              <div class="empty-state" style="padding:30px"><span class="ei" style="font-size:28px">🗂️</span><p>Create tournament first</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── FIXTURES ── -->
+        <div id="section-fixtures" class="admin-panel-section">
+          <div class="card">
+            <div class="card-title">📅 Generate <span class="acc">Fixtures</span></div>
+            <p style="font-size:13px;color:var(--silver);margin-bottom:16px">Generate round-robin fixtures for all groups.</p>
+            <button class="btn btn-red" onclick="generateFixtures()">📅 Generate Group Fixtures</button>
+          </div>
+          <div class="card" style="margin-top:16px">
+            <div class="card-title">Fixture <span class="acc">List</span></div>
+            <div id="fixtures-preview"></div>
+          </div>
+        </div>
+
+        <!-- ── RESULTS ── -->
+        <div id="section-results" class="admin-panel-section">
+          <div class="card">
+            <div class="card-title">✅ Submit <span class="acc">Results</span></div>
+            <p style="font-size:13px;color:var(--silver);margin-bottom:16px">Organized by Group → Round → Matches</p>
+          </div>
+          <div id="results-container"></div>
+        </div>
+
+        <!-- ── KNOCKOUT ── -->
+        <div id="section-knockout" class="admin-panel-section">
+          <div class="card">
+            <div class="card-title">⚔️ Knockout <span class="acc">Generator</span></div>
+            <div class="form-group">
+              <label class="form-label">Start Knockout From</label>
+              <div class="radio-group">
+                <label class="radio-opt"><input type="radio" name="ko-start-round" value="R32"> Round of 32</label>
+                <label class="radio-opt"><input type="radio" name="ko-start-round" value="R16" checked> Round of 16</label>
+                <label class="radio-opt"><input type="radio" name="ko-start-round" value="QF"> Quarter Final</label>
+                <label class="radio-opt"><input type="radio" name="ko-start-round" value="SF"> Semi Final</label>
+              </div>
+              <p style="font-size:11px;color:var(--muted);margin-top:6px">Initial knockout pairings will try to avoid players from the same group.</p>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Match Format</label>
+              <div class="radio-group">
+                <label class="radio-opt"><input type="radio" name="ko-legs" value="1" checked> 1-Leg Match</label>
+                <label class="radio-opt"><input type="radio" name="ko-legs" value="2"> 2-Leg Match</label>
+              </div>
+              <p style="font-size:11px;color:var(--muted);margin-top:6px">⚠️ Final is always single-leg regardless of selection.</p>
+            </div>
+            <button class="btn btn-red" onclick="generateKnockout()">⚔️ Generate Knockout Bracket</button>
+          </div>
+          <div class="card" style="margin-top:16px" id="ko-admin-card">
+            <div class="card-title">Bracket <span class="acc">Management</span></div>
+            <div class="ko-tabs" id="ko-admin-round-tabs"></div>
+            <div id="ko-admin-matches"></div>
+          </div>
+        </div>
+
+        <!-- ── SEASONS ── -->
+        <div id="section-seasons" class="admin-panel-section">
+          <div class="card">
+            <div class="card-title">📚 Season <span class="acc">History</span></div>
+            <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+              <button class="btn btn-gold btn-sm" onclick="archiveCurrentSeason()">📦 Archive Current Season</button>
+            </div>
+            <div id="seasons-admin-list"></div>
+          </div>
+        </div>
+
+        <!-- ── MATCH LOG ── -->
+        <div id="section-log" class="admin-panel-section">
+          <div class="card">
+            <div class="card-title">📋 Match <span class="acc">Log</span></div>
+            <div style="display:flex;gap:8px;margin-bottom:12px">
+              <button class="btn btn-ghost btn-sm" onclick="undoLastResult()">↩️ Undo Last</button>
+              <button class="btn btn-danger btn-sm" onclick="clearMatchLog()">🗑️ Clear Log</button>
+            </div>
+            <div id="match-log-wrap">
+              <table class="log-table">
+                <thead>
+                  <tr><th>#</th><th>Stage</th><th>Match</th><th>Score</th><th>Time</th></tr>
+                </thead>
+                <tbody id="match-log-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── SETTINGS ── -->
+        <div id="section-settings" class="admin-panel-section">
+          <div class="card">
+            <div class="card-title">⚙️ <span class="acc">Settings</span></div>
+            <div class="form-group">
+              <label class="form-label">Change Season Number</label>
+              <div style="display:flex;gap:8px">
+                <input type="number" id="season-input" class="form-input" value="5" min="1" max="99" style="max-width:100px">
+                <button class="btn btn-gold btn-sm" onclick="changeSeason()">Apply</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tournament Logo</label>
+              <div class="fixed-logo-note">
+                <img class="settings-logo-preview tournament-logo" src="assets/logos/tournament-logo.png" alt="Tournament Logo">
+                <span>Fixed codebase logo: <strong>assets/logos/tournament-logo.png</strong></span>
+              </div>
+            </div>
+            <div class="divider"></div>
+            <div class="form-group">
+              <label class="form-label">Export Data</label>
+              <button class="btn btn-ghost btn-sm" onclick="exportData()">💾 Export JSON</button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /admin-content -->
+    </div><!-- /admin-layout -->
+  </div><!-- /admin-panel -->
+</div><!-- /view-admin -->
+
+<!-- ═══════════════════════════════════════════
+     MODALS
+═══════════════════════════════════════════ -->
+
+<!-- Danger Zone -->
+<div class="modal-overlay" id="modal-danger">
+  <div class="modal">
+    <div class="modal-title">⚠️ Danger <span>Zone</span></div>
+    <button class="modal-close" onclick="closeModal('modal-danger')">✕</button>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-danger" onclick="resetTournament()">🔄 Reset Tournament (Keep Players)</button>
+      <button class="btn btn-danger" onclick="clearMatchLog()">🗑️ Clear Match Log</button>
+      <button class="btn btn-danger" onclick="deleteTournament()">💥 Delete Entire Tournament</button>
+    </div>
+  </div>
+</div>
+
+<!-- Submit Result -->
+<div class="modal-overlay" id="modal-submit-result">
+  <div class="modal">
+    <div class="modal-title">✅ Submit <span>Result</span></div>
+    <button class="modal-close" onclick="closeModal('modal-submit-result')">✕</button>
+    <div id="modal-result-body"></div>
+  </div>
+</div>
+
+<!-- KO Result -->
+<div class="modal-overlay" id="modal-ko-result">
+  <div class="modal">
+    <div class="modal-title">⚔️ KO <span>Result</span></div>
+    <button class="modal-close" onclick="closeModal('modal-ko-result')">✕</button>
+    <div id="modal-ko-body"></div>
+  </div>
+</div>
+
+<!-- Season Archive View -->
+<div class="modal-overlay" id="modal-season-view">
+  <div class="modal modal-lg">
+    <div class="modal-title">📚 Season <span>Archive</span></div>
+    <button class="modal-close" onclick="closeModal('modal-season-view')">✕</button>
+    <div id="modal-season-body"></div>
+  </div>
+</div>
+
+<!-- ═══ SCRIPTS ═══ -->
+<script src="script.js"></script>
+
+</body>
+</html>
