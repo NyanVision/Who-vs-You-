@@ -57,15 +57,40 @@ function hideLoading() {
 }
 
 /* ─── SIDEBAR ─── */
-function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('open');
+let adminDrawerScrollY = 0;
+
+function setAdminDrawerOpen(open) {
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar) return;
+
+  if (open) {
+    sidebar.classList.add('open');
+    if (window.innerWidth <= 900 && !document.body.classList.contains('admin-drawer-open')) {
+      adminDrawerScrollY = window.scrollY || window.pageYOffset || 0;
+      document.body.style.top = '-' + adminDrawerScrollY + 'px';
+      document.body.classList.add('admin-drawer-open');
+    }
+  } else {
+    sidebar.classList.remove('open');
+    if (document.body.classList.contains('admin-drawer-open')) {
+      document.body.classList.remove('admin-drawer-open');
+      document.body.style.top = '';
+      window.scrollTo(0, adminDrawerScrollY);
+    }
+  }
 }
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  setAdminDrawerOpen(!sidebar.classList.contains('open'));
+}
+
 function switchSection(id) {
   document.querySelectorAll('.sb-item').forEach(el => el.classList.remove('active'));
   document.querySelector(`[data-section="${id}"]`)?.classList.add('active');
   document.querySelectorAll('.admin-panel-section').forEach(el => el.classList.remove('active'));
   document.getElementById('section-' + id)?.classList.add('active');
-  if (window.innerWidth <= 900) document.getElementById('sidebar').classList.remove('open');
+  if (window.innerWidth <= 900) setAdminDrawerOpen(false);
   if (id === 'results') renderResultsSection();
   if (id === 'groups') renderGroupSettings();
   if (id === 'fixtures') renderFixturesPreview();
@@ -285,6 +310,7 @@ function renderRecentActivity() {
 
 /* ─── VIEW SWITCHING ─── */
 function showView(v) {
+  if (v !== 'admin') setAdminDrawerOpen(false);
   document.getElementById('view-public').classList.toggle('visible', v === 'public');
   document.getElementById('view-admin').classList.toggle('visible', v === 'admin');
 
