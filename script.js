@@ -85,6 +85,35 @@ function toggleSidebar() {
   setAdminDrawerOpen(!sidebar.classList.contains('open'));
 }
 
+function hasGroupStage() {
+  return state.tournament?.has_group_stage !== false;
+}
+
+function toggleGroupStageFields() {
+  const enabled = document.querySelector('input[name="has-group-stage"]:checked')?.value !== 'no';
+  const groupSettings = document.getElementById('group-stage-settings');
+  const advanceSettings = document.getElementById('advance-settings');
+  if (groupSettings) groupSettings.style.display = enabled ? '' : 'none';
+  if (advanceSettings) advanceSettings.style.display = enabled ? '' : 'none';
+}
+
+function syncGroupStageUI() {
+  const enabled = !state.tournament || hasGroupStage();
+  ['groups','fixtures','results'].forEach(section => {
+    const publicNav = document.getElementById('nav-' + section);
+    if (publicNav) publicNav.style.display = enabled ? '' : 'none';
+    const adminNav = document.querySelector('.sb-item[data-section="' + section + '"]');
+    if (adminNav) adminNav.style.display = enabled ? '' : 'none';
+  });
+  const yes = document.querySelector('input[name="has-group-stage"][value="yes"]');
+  const no = document.querySelector('input[name="has-group-stage"][value="no"]');
+  if (state.tournament && yes && no) {
+    yes.checked = hasGroupStage();
+    no.checked = !hasGroupStage();
+  }
+  toggleGroupStageFields();
+}
+
 function switchSection(id) {
   document.querySelectorAll('.sb-item').forEach(el => el.classList.remove('active'));
   document.querySelector(`[data-section="${id}"]`)?.classList.add('active');
@@ -242,6 +271,7 @@ async function loadAll() {
   }
 }
 function renderAll() {
+  syncGroupStageUI();
   updateStatusBar();
   renderPublicView();
   updatePublicSectionMeta();
@@ -269,6 +299,7 @@ function updateStatusBar() {
   const total  = state.fixtures.filter(f => f.stage === 'group').length;
   const ko = state.knockout.length > 0;
   if (ko) setStatus('gold', `KO Stage  ·  ${state.tournament.name}  ·  Season ${season}`);
+  else if (!hasGroupStage()) setStatus('green', `${state.tournament.name}  ·  Season ${season}  ·  Knockout setup pending`);
   else setStatus('green', `${state.tournament.name}  ·  Season ${season}  ·  ${played}/${total} group matches played`);
 }
 function updateDashboard() {
@@ -333,6 +364,7 @@ function updatePublicNav() {
   });
 }
 function showPublicSection(section) {
+  if (state.tournament && !hasGroupStage() && ['groups','fixtures','results'].includes(section)) section = 'knockout';
   state.currentStage=section;
   showView('public');
   const map={groups:'stage-group',fixtures:'stage-fixtures',results:'stage-results',knockout:'stage-ko'};
@@ -421,20 +453,22 @@ async function adminLogin() {
 async function createTournament() {
   const name      = document.getElementById('t-name').value.trim() || 'Who vs You? eTournament';
   const season    = parseInt(document.getElementById('t-season').value) || 5;
-  const numGroups = parseInt(document.getElementById('t-groups').value) || 4;
-  const ppg       = parseInt(document.getElementById('t-ppg').value) || 4;
-  const advance   = parseInt(document.querySelector('input[name="advance"]:checked')?.value || 2);
+  const hasGroups = document.querySelector('input[name="has-group-stage"]:checked')?.value !== 'no';
+  const numGroups = hasGroups ? (parseInt(document.getElementById('t-groups').value) || 4) : 0;
+  const ppg       = hasGroups ? (parseInt(document.getElementById('t-ppg').value) || 4) : 0;
+  const advance   = hasGroups ? parseInt(document.querySelector('input[name="advance"]:checked')?.value || 2) : 0;
   state.advancePlayers = advance;
-  const t = { id:1, name, season, num_groups:numGroups, players_per_group:ppg, advance_players:advance, stage:'group', created_at:new Date().toISOString() };
+  const t = { id:1, name, season, has_group_stage:hasGroups, num_groups:numGroups, players_per_group:ppg, advance_players:advance, stage:hasGroups?'group':'ko', created_at:new Date().toISOString() };
   state.tournament = t;
-  state.groups = Array.from({length:numGroups}, (_,i) => ({id:'Group '+GROUP_LETTERS[i], name:'Group '+GROUP_LETTERS[i], players:[]}));
+  state.groups = hasGroups ? Array.from({length:numGroups}, (_,i) => ({id:'Group '+GROUP_LETTERS[i], name:'Group '+GROUP_LETTERS[i], players:[]})) : [];
   state.fixtures = []; state.knockout = []; state.matchLog = [];
   await saveData('tournaments', t);
   await saveData('groups', state.groups);
   await saveData('fixtures', []);
   await saveData('knockout_matches', []);
   await saveData('match_log', []);
-  toast('Tournament created!', 'success');
+  state.currentStage = hasGroups ? 'groups' : 'knockout';
+  toast(hasGroups ? 'Tournament created with group stage!' : 'Tournament created without group stage!', 'success');
   renderAll();
   renderTournamentInfo();
   switchSection('players');
@@ -444,15 +478,19 @@ function renderTournamentInfo() {
   if (!state.tournament) { card.style.display = 'none'; return; }
   card.style.display = 'block';
   const t = state.tournament;
+  const groupCards = hasGroupStage() ? `
+      <div class="stat-card card-sm"><div class="stat-num" style="font-size:22px">${t.num_groups}</div><div class="stat-label">Groups</div></div>
+      <div class="stat-card card-sm"><div class="stat-num" style="font-size:22px">${t.players_per_group}</div><div class="stat-label">Per Group</div></div>
+      <div class="stat-card card-sm gold"><div class="stat-num" style="font-size:22px">Top ${t.advance_players||2}</div><div class="stat-label">Advance</div></div>` : '';
   document.getElementById('tournament-info-body').innerHTML = `
     <div class="tournament-info-logo-row">${tournamentLogoHtml('settings-logo-preview tournament-logo')}</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px">
       <div class="stat-card card-sm"><div class="stat-num" style="font-size:18px">${t.name}</div><div class="stat-label">Name</div></div>
       <div class="stat-card card-sm gold"><div class="stat-num" style="font-size:22px">${t.season}</div><div class="stat-label">Season</div></div>
-      <div class="stat-card card-sm"><div class="stat-num" style="font-size:22px">${t.num_groups}</div><div class="stat-label">Groups</div></div>
-      <div class="stat-card card-sm"><div class="stat-num" style="font-size:22px">${t.players_per_group}</div><div class="stat-label">Per Group</div></div>
-      <div class="stat-card card-sm gold"><div class="stat-num" style="font-size:22px">Top ${t.advance_players||2}</div><div class="stat-label">Advance</div></div>
+      <div class="stat-card card-sm"><div class="stat-num" style="font-size:22px">${hasGroupStage()?'Yes':'No'}</div><div class="stat-label">Group Stage</div></div>
+      ${groupCards}
     </div>`;
+  syncGroupStageUI();
 }
 
 /* ─── PLAYERS ─── */
@@ -565,6 +603,7 @@ async function savePlayers() {
 /* ─── GROUPS ─── */
 async function randomizeGroups() {
   if (!state.tournament) { toast('Create tournament first', 'warning'); return; }
+  if (!hasGroupStage()) { toast('Group stage is disabled for this tournament', 'warning'); return; }
   if (state.players.length < 2) { toast('Add players first', 'warning'); return; }
   const shuffled = [...state.players].sort(() => Math.random() - .5);
   state.groups.forEach(g => g.players = []);
@@ -593,6 +632,7 @@ function renderGroupSettings() {
 /* ─── FIXTURES GENERATION ─── */
 async function generateFixtures() {
   if (!state.tournament) { toast('Create tournament first', 'warning'); return; }
+  if (!hasGroupStage()) { toast('Group stage is disabled for this tournament', 'warning'); return; }
   if (state.groups.every(g => !g.players || !g.players.length)) { toast('Randomize groups first', 'warning'); return; }
   state.fixtures = state.fixtures.filter(f => f.stage !== 'group');
   let fid = Date.now();
@@ -686,6 +726,9 @@ function getSortedStandings(gid) {
 }
 function getAdvanceCount() { return state.tournament?.advance_players || state.advancePlayers || 2; }
 function getQualified() {
+  if (state.tournament && !hasGroupStage()) {
+    return state.players.map(p => ({player_id:p.id, name:p.name, groupName:'Direct-' + p.id}));
+  }
   const q = [];
   state.groups.forEach(g => getSortedStandings(g.id).slice(0, getAdvanceCount()).forEach(p => q.push({...p, groupName:g.name})));
   return q;
@@ -1204,7 +1247,7 @@ function renderPublicView() {
   renderPublicResults();
   renderKnockoutView();
   checkChampion();
-  showPublicSection(state.currentStage || 'groups');
+  showPublicSection(state.tournament && !hasGroupStage() ? 'knockout' : (state.currentStage || 'groups'));
 }
 
 function renderGroupStage() {
