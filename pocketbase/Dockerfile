@@ -2,7 +2,7 @@ FROM alpine:3.22
 
 ARG PB_VERSION=0.40.4
 
-RUN apk add --no-cache unzip ca-certificates \
+RUN apk add --no-cache unzip ca-certificates su-exec \
   && addgroup -S pocketbase \
   && adduser -S -G pocketbase pocketbase
 
@@ -14,8 +14,7 @@ RUN mkdir -p /pb/pb_data /pb/pb_migrations \
 
 COPY --chown=pocketbase:pocketbase pb_migrations /pb/pb_migrations
 
-USER pocketbase
 WORKDIR /pb
 EXPOSE 8080
 
-CMD ["/bin/sh", "-c", "/pb/pocketbase serve --http=0.0.0.0:${PORT:-8080}"]
+CMD ["/bin/sh", "-c", "chown -R pocketbase:pocketbase /pb/pb_data && exec su-exec pocketbase /pb/pocketbase serve --http=0.0.0.0:${PORT:-8080}"]
