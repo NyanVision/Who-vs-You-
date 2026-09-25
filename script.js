@@ -4,8 +4,8 @@
 
 ═══════════════════════════════════════════ */
 const GROUP_LETTERS = 'ABCDEFGHIJKLMNOP'.split('');
-const KO_ROUNDS = ['R32','R16','QF','SF','F'];
-const KO_LABELS = {R32:'Round of 32',R16:'Round of 16',QF:'Quarter Final',SF:'Semi Final',F:'Final'};
+const KO_ROUNDS = ['R64','R32','R16','QF','SF','F'];
+const KO_LABELS = {R64:'Round of 64',R32:'Round of 32',R16:'Round of 16',QF:'Quarter Final',SF:'Semi Final',F:'Final'};
 const TOURNAMENT_LOGO = 'tournament-logo.png';
 const PB_DEFAULT_URL = 'https://pocketbase-production-9b4f.up.railway.app';
 const ADMIN_EMAIL = 'admin@wvy.local';
@@ -831,7 +831,7 @@ async function undoLastResult() {
   state.knockout.forEach(f => {
     if (f.played && `${getPlayerName(f.home)} vs ${getPlayerName(f.away)}` === last.match) {
       f.played = false; f.home_score = null; f.away_score = null; f.winner = null;
-      if (f.legs) f.legs = [];
+      f.leg_results = []; delete f.extra_time; delete f.penalties;
     }
   });
   state.matchLog.shift();
@@ -845,7 +845,7 @@ async function undoLastResult() {
 
 /* ─── KNOCKOUT ─── */
 function getKnockoutSlots(round) {
-  return {R32:32, R16:16, QF:8, SF:4, F:2}[round] || 16;
+  return {R64:64, R32:32, R16:16, QF:8, SF:4, F:2}[round] || 16;
 }
 
 function countSameGroupConflicts(pairs) {
@@ -913,7 +913,7 @@ async function generateKnockout() {
   let matchesInRound = slots / 2;
   roundOrder.forEach((round, ri) => {
     const isLast = round === 'F';
-    const legs = (isLast || state.koLegs === 1) ? 1 : 2;
+    const legs = state.koLegs === 3 ? 3 : ((isLast || state.koLegs === 1) ? 1 : 2);
     for (let m = 0; m < matchesInRound; m++) {
       const f = {
         id: mid++, round, match_num: m+1, stage: 'ko', legs,
@@ -1005,9 +1005,26 @@ function switchKoRound(r) {
 async function openKoResult(fid) {
   const f = state.knockout.find(x => x.id == fid); if (!f) return;
   const home = getPlayerName(f.home), away = getPlayerName(f.away);
+  const isBo3 = f.legs === 3;
   const isTwo = f.legs === 2 && f.round !== 'F';
   let legHtml = '';
-  if (isTwo) {
+
+  if (isBo3) {
+    const current = (f.home_score !== null && f.away_score !== null) ? `${f.home_score}-${f.away_score}` : '';
+    const option = (value, label) => `<option value="${value}"${current===value?' selected':''}>${label}</option>`;
+    legHtml = `
+      <div style="margin-bottom:14px">
+        <div class="form-label" style="margin-bottom:8px">BO3 Series Result</div>
+        <select id="ko-bo3-result" class="form-input">
+          <option value="">Select result</option>
+          ${option('2-0', `${home} 2 – 0 ${away}`)}
+          ${option('2-1', `${home} 2 – 1 ${away}`)}
+          ${option('1-2', `${home} 1 – 2 ${away}`)}
+          ${option('0-2', `${home} 0 – 2 ${away}`)}
+        </select>
+        <p style="font-size:11px;color:var(--muted);margin-top:8px">BO3 is first to 2 wins. Only 2–0, 2–1, 1–2, and 0–2 are accepted.</p>
+      </div>`;
+  } else if (isTwo) {
     const l1 = f.leg_results?.find(l=>l.leg===1) || {home:'',away:''};
     const l2 = f.leg_results?.find(l=>l.leg===2) || {home:'',away:''};
     legHtml = `
@@ -1049,7 +1066,7 @@ async function openKoResult(fid) {
         <input type="number" id="ko-l1-a" class="score-box" value="${f.away_score??''}" min="0" style="width:44px;height:44px">
         <span style="flex:1;font-family:var(--ff-ui);font-size:15px;font-weight:700">${away}</span>
       </div>
-      ${f.round === 'F' || !isTwo ? `<div style="margin-bottom:12px">
+      <div style="margin-bottom:12px">
         <div id="et-toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:8px" onclick="toggleET()">
           <input type="checkbox" id="et-check" style="accent-color:var(--red)"> <span style="font-family:var(--ff-ui);font-size:13px">Extra Time / Penalties?</span>
         </div>
@@ -1071,11 +1088,13 @@ async function openKoResult(fid) {
             <span style="flex:1;font-family:var(--ff-ui);font-size:13px">${away}</span>
           </div>
         </div>
-      </div>` : ''}`;
+      </div>`;
   }
+
   document.getElementById('modal-ko-body').innerHTML = `
     ${legHtml}
-    <button class="btn btn-red" style="width:100%;justify-content:center" onclick="submitKoResult(${f.id},${isTwo})">Submit Result</button>`;
+    <button class="btn btn-red" style="width:100%;justify-content:center" onclick="submitKoResult(${f.id})">Submit Result</button>`;
+
   if (isTwo) {
     ['ko-l1-h','ko-l1-a','ko-l2-h','ko-l2-a'].forEach(id => {
       document.getElementById(id)?.addEventListener('input', () => updateAggPreview(home, away));
@@ -1101,10 +1120,24 @@ function updateAggPreview(home, away) {
   }
 }
 
-async function submitKoResult(fid, isTwoLeg) {
+async function submitKoResult(fid) {
   const f = state.knockout.find(x => x.id == fid); if (!f) return;
+  const isBo3 = f.legs === 3;
+  const isTwoLeg = f.legs === 2 && f.round !== 'F';
   let winner = null;
-  if (isTwoLeg) {
+
+  if (isBo3) {
+    const result = document.getElementById('ko-bo3-result')?.value || '';
+    const allowed = ['2-0','2-1','1-2','0-2'];
+    if (!allowed.includes(result)) { toast('Select a valid BO3 result','warning'); return; }
+    const [hs, as] = result.split('-').map(Number);
+    f.home_score = hs;
+    f.away_score = as;
+    f.leg_results = [];
+    delete f.extra_time;
+    delete f.penalties;
+    winner = hs > as ? f.home : f.away;
+  } else if (isTwoLeg) {
     const l1h = parseInt(document.getElementById('ko-l1-h')?.value);
     const l1a = parseInt(document.getElementById('ko-l1-a')?.value);
     const l2a = parseInt(document.getElementById('ko-l2-a')?.value) || 0;
@@ -1138,7 +1171,9 @@ async function submitKoResult(fid, isTwoLeg) {
     }
     if (!winner) winner = hs > as ? f.home : as > hs ? f.away : f.home;
   }
-  f.winner = winner; f.played = true;
+
+  f.winner = winner;
+  f.played = true;
   state.matchLog.unshift({id:Date.now(), group:f.round, match:`${getPlayerName(f.home)} vs ${getPlayerName(f.away)}`, score:`${f.home_score}–${f.away_score}`, time:new Date().toLocaleTimeString()});
   advanceKnockout(f);
   await saveData('knockout_matches', state.knockout);
