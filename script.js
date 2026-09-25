@@ -7,7 +7,7 @@ const ADMIN_PASS = 'zayyarkyaw35';
 const GROUP_LETTERS = 'ABCDEFGHIJKLMNOP'.split('');
 const KO_ROUNDS = ['R32','R16','QF','SF','F'];
 const KO_LABELS = {R32:'Round of 32',R16:'Round of 16',QF:'Quarter Final',SF:'Semi Final',F:'Final'};
-const TOURNAMENT_LOGO = 'assets/logos/tournament-logo.png';
+const TOURNAMENT_LOGO = 'tournament-logo.png';
 const PB_DEFAULT_URL = 'http://127.0.0.1:8090';
 
 let state = {
@@ -43,7 +43,7 @@ function spawnParticles() {
       opacity:${0.3+Math.random()*0.5};
       width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;
       background:${Math.random()>.6?'rgba(196,154,48,0.5)':'rgba(204,0,0,0.5)'};
-    `;
+ `;
     container.appendChild(p);
   }
 }
@@ -413,7 +413,7 @@ function updatePendingBadge() {
 function renderRecentActivity() {
   const el = document.getElementById('recent-activity');
   if (!state.matchLog.length) {
-    el.innerHTML = '<div class="empty-state" style="padding:20px"><span class="ei" style="font-size:24px">📋</span><p>No activity yet</p></div>';
+    el.innerHTML = '<div class="empty-state" style="padding:20px"><span class="ei" style="font-size:24px"></span><p>No activity yet</p></div>';
     return;
   }
   el.innerHTML = state.matchLog.slice(0, 8).map((entry, i) => `
@@ -539,7 +539,7 @@ function renderPlayerList() {
   state.players.forEach((p, i) => {
     const tag = document.createElement('div');
     tag.className = 'player-tag player-photo-tag';
-    tag.innerHTML = `${playerAvatarHtml(p)}<span>${p.name}</span><button class="remove-btn" onclick="removePlayer(${i})">✕</button>`;
+    tag.innerHTML = `${playerAvatarHtml(p)}<span>${p.name}</span><button class="remove-btn" onclick="removePlayer(${i})"></button>`;
     c.appendChild(tag);
   });
   const pc = document.getElementById('player-count');
@@ -642,7 +642,7 @@ async function randomizeGroups() {
 function renderGroupSettings() {
   const el = document.getElementById('group-settings-body');
   if (!state.tournament || !state.groups.length) {
-    el.innerHTML = '<div class="empty-state" style="padding:30px"><span class="ei" style="font-size:28px">🗂️</span><p>Create tournament first</p></div>';
+    el.innerHTML = '<div class="empty-state" style="padding:30px"><span class="ei" style="font-size:28px"></span><p>Create tournament first</p></div>';
     return;
   }
   el.innerHTML = state.groups.map(g => `
@@ -699,7 +699,7 @@ function generateRoundRobin(players) {
 
 function renderFixturesPreview() {
   const el = document.getElementById('fixtures-preview');
-  if (!state.fixtures.length) { el.innerHTML = '<div class="empty-state" style="padding:20px"><span class="ei" style="font-size:24px">📅</span><p>Generate fixtures first</p></div>'; return; }
+  if (!state.fixtures.length) { el.innerHTML = '<div class="empty-state" style="padding:20px"><span class="ei" style="font-size:24px"></span><p>Generate fixtures first</p></div>'; return; }
   el.innerHTML = state.groups.map(g => {
     const gf = state.fixtures.filter(f => f.group_id === g.id && f.stage === 'group');
     if (!gf.length) return '';
@@ -760,7 +760,7 @@ function getQualified() {
 function renderResultsSection() {
   const container = document.getElementById('results-container');
   if (!state.fixtures.length) {
-    container.innerHTML = '<div class="card"><div class="empty-state"><span class="ei">📅</span><h3>No Fixtures</h3><p>Generate fixtures first</p></div></div>';
+    container.innerHTML = '<div class="card"><div class="empty-state"><span class="ei"></span><h3>No Fixtures</h3><p>Generate fixtures first</p></div></div>';
     return;
   }
   container.innerHTML = state.groups.map(g => {
@@ -774,7 +774,7 @@ function renderResultsSection() {
       <div class="results-group-header" onclick="toggleGroupBlock('${gid}')">
         <span class="results-group-label">${g.name}</span>
         <span class="results-group-stats">${playedCount}/${gf.length} played</span>
-        <span class="results-group-toggle open" id="${gid}_toggle">▼</span>
+        <span class="results-group-toggle open" id="${gid}_toggle"></span>
       </div>
       <div class="results-group-body" id="${gid}_body">
         ${Array.from({length:maxRound}, (_,ri) => {
@@ -786,7 +786,7 @@ function renderResultsSection() {
             <div class="results-round-header" onclick="toggleRoundBlock('${rid}')">
               <span class="results-round-label">Round ${ri+1}</span>
               <span class="results-round-prog">${roundPlayed}/${roundMatches.length}</span>
-              <span id="${rid}_toggle" style="color:var(--muted);font-size:10px;margin-left:6px">▼</span>
+              <span id="${rid}_toggle" style="color:var(--muted);font-size:10px;margin-left:6px"></span>
             </div>
             <div class="results-round-body" id="${rid}_body">
               ${roundMatches.map(f => renderResultMatchCard(f)).join('')}
@@ -818,12 +818,12 @@ function renderResultMatchCard(f) {
       <span class="result-match-player away">${away}</span>
     </div>
     <div class="result-match-bottom">
-      <span class="match-status-tag ${f.played?'done':'pending'}">${f.played?'✓ Played':'Pending'}</span>
+      <span class="match-status-tag ${f.played?'done':'pending'}">${f.played?' Played':'Pending'}</span>
       <div class="match-action-btns">
         ${f.played
-          ? `<span class="winner-tag">🏆 ${winner}${winner!=='Draw'?` (+${gd})`:''}</span>
-             <button class="btn btn-ghost btn-xs" onclick="editResult(${f.id})">✏️ Edit</button>`
-          : `<button class="btn btn-green btn-xs" onclick="quickSubmit(${f.id})">✅ Submit</button>`
+          ? `<span class="winner-tag"> ${winner}${winner!=='Draw'?` (+${gd})`:''}</span>
+             <button class="btn btn-ghost btn-xs" onclick="editResult(${f.id})"> Edit</button>`
+          : `<button class="btn btn-green btn-xs" onclick="quickSubmit(${f.id})"> Submit</button>`
         }
       </div>
     </div>
@@ -1028,7 +1028,7 @@ function renderKoAdminSection() {
   const matchEl = document.getElementById('ko-admin-matches');
   if (!state.knockout.length) {
     tabsEl.innerHTML = '';
-    matchEl.innerHTML = '<div class="empty-state" style="padding:30px"><span class="ei" style="font-size:28px">⚔️</span><p>Generate knockout first</p></div>';
+    matchEl.innerHTML = '<div class="empty-state" style="padding:30px"><span class="ei" style="font-size:28px"></span><p>Generate knockout first</p></div>';
     return;
   }
   const rounds = [...new Set(state.knockout.map(m => m.round))];
@@ -1051,10 +1051,10 @@ function renderKoAdminSection() {
       </div>
       ${agg && f.legs===2 ? `<div style="text-align:center;margin:6px 0"><span class="agg-display">AGG: ${agg.home}–${agg.away}</span></div>` : ''}
       <div class="result-match-bottom">
-        <span class="match-status-tag ${f.played?'done':'pending'}">${f.played?'✓ Played':'Pending'}</span>
+        <span class="match-status-tag ${f.played?'done':'pending'}">${f.played?' Played':'Pending'}</span>
         <div class="match-action-btns">
-          ${f.home && f.away ? `<button class="btn btn-green btn-xs" onclick="openKoResult(${f.id})">⚔️ ${f.played?'Edit':'Submit'}</button>` : ''}
-          ${f.winner ? `<span class="winner-tag">🏆 ${getPlayerName(f.winner)}</span>` : ''}
+          ${f.home && f.away ? `<button class="btn btn-green btn-xs" onclick="openKoResult(${f.id})"> ${f.played?'Edit':'Submit'}</button>` : ''}
+          ${f.winner ? `<span class="winner-tag"> ${getPlayerName(f.winner)}</span>` : ''}
         </div>
       </div>
     </div>`;
@@ -1222,7 +1222,7 @@ function checkChampion() {
   if (final) {
     const name = getPlayerName(final.winner);
     el.style.display = 'block';
-    el.innerHTML = `<div class="champion-card"><span class="champion-trophy">🏆</span><div class="champion-title">Season ${state.tournament?.season||''} Champion</div><div class="champion-name">${name}</div></div>`;
+    el.innerHTML = `<div class="champion-card"><span class="champion-trophy"></span><div class="champion-title">Season ${state.tournament?.season||''} Champion</div><div class="champion-name">${name}</div></div>`;
   } else { el.style.display = 'none'; }
 }
 
@@ -1238,8 +1238,8 @@ function renderPublicView() {
 
 function renderGroupStage() {
   const c = document.getElementById('groups-container');
-  if (!state.tournament) { c.innerHTML = '<div class="empty-state"><span class="ei">🏟️</span><h3>No Tournament</h3><p>Admin creates the tournament.</p></div>'; return; }
-  if (state.groups.every(g => !g.players || !g.players.length)) { c.innerHTML = '<div class="empty-state"><span class="ei">👥</span><h3>Waiting for Setup</h3><p>Admin is setting up groups.</p></div>'; return; }
+  if (!state.tournament) { c.innerHTML = '<div class="empty-state"><span class="ei"></span><h3>No Tournament</h3><p>Admin creates the tournament.</p></div>'; return; }
+  if (state.groups.every(g => !g.players || !g.players.length)) { c.innerHTML = '<div class="empty-state"><span class="ei"></span><h3>Waiting for Setup</h3><p>Admin is setting up groups.</p></div>'; return; }
   c.innerHTML = '<div class="groups-grid">' + state.groups.map(g => {
     if (!g.players || !g.players.length) return '';
     const sorted = getSortedStandings(g.id);
@@ -1253,7 +1253,7 @@ function renderGroupStage() {
           <thead><tr><th>#</th><th>Player</th><th>P</th><th>GD</th><th>PTS</th></tr></thead>
           <tbody>${sorted.map((row,i)=>{const isQ=i<getAdvanceCount();return`<tr class="${isQ?'qualified':''}"><td><span class="rank-num">${i+1}</span></td><td><span class="standing-player">${playerAvatarHtml(getPlayer(row.player_id), 'player-avatar tiny')}<span>${row.name}</span></span></td><td>${row.p}</td><td>${row.gd>0?'+':''}${row.gd}</td><td class="pts-col">${row.pts}</td></tr>`}).join('')}</tbody>
         </table>
-        <div class="q-badge">✦ Top ${getAdvanceCount()} Advance</div>
+        <div class="q-badge"> Top ${getAdvanceCount()} Advance</div>
         ${maxRound > 0 ? `<div class="divider"></div><div style="font-family:var(--ff-hud);font-size:9px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Fixtures by Round</div>
           ${Array.from({length:maxRound},(_,ri)=>{
             const rm = gf.filter(f=>(f.round||1)===ri+1);
@@ -1273,7 +1273,7 @@ function renderKnockoutView() {
   if (!state.tournament) return;
   const rounds = [...new Set(state.knockout.map(m => m.round))];
   const tabsEl = document.getElementById('ko-round-tabs'), matchEl = document.getElementById('ko-matches-container');
-  if (!rounds.length) { tabsEl.innerHTML=''; matchEl.innerHTML='<div class="empty-state"><span class="ei">⚔️</span><h3>Knockout Not Started</h3><p>Group stage must complete first.</p></div>'; renderBracket(); return; }
+  if (!rounds.length) { tabsEl.innerHTML=''; matchEl.innerHTML='<div class="empty-state"><span class="ei"></span><h3>Knockout Not Started</h3><p>Group stage must complete first.</p></div>'; renderBracket(); return; }
   tabsEl.innerHTML = rounds.map(r => `<button class="ko-tab${state.currentKoRound===r?' active':''}" onclick="pubSwitchKo('${r}')">${KO_LABELS[r]||r}</button>`).join('');
   const matches = state.knockout.filter(m => m.round === state.currentKoRound);
   matchEl.innerHTML = '<div class="fixture-list">' + matches.map(f => {
@@ -1295,7 +1295,7 @@ function pubSwitchKo(r) { state.currentKoRound = r; renderKnockoutView(); }
 function renderBracket() {
   const el = document.getElementById('bracket-display');
   const rounds = [...new Set(state.knockout.map(m => m.round))];
-  if (!rounds.length) { el.innerHTML = '<div class="empty-state" style="padding:20px"><span class="ei" style="font-size:28px">⚔️</span><p>No bracket yet</p></div>'; return; }
+  if (!rounds.length) { el.innerHTML = '<div class="empty-state" style="padding:20px"><span class="ei" style="font-size:28px"></span><p>No bracket yet</p></div>'; return; }
   el.innerHTML = rounds.map(r => {
     const matches = state.knockout.filter(m => m.round === r);
     return `<div class="bracket-round">
@@ -1373,7 +1373,7 @@ function showSeasonView(season) {
   const champion = season.champion || (final ? (season.players?.find(p=>p.id==final.winner)?.name||'?') : null);
   el.innerHTML = `
     <div class="champion-card" style="margin-bottom:16px">
-      <span class="champion-trophy">🏆</span>
+      <span class="champion-trophy"></span>
       <div class="champion-title">Season ${season.season} Champion</div>
       <div class="champion-name">${champion||'TBD'}</div>
       <div style="font-family:var(--ff-hud);font-size:9px;color:var(--muted);margin-top:8px">${season.name} · Archived ${new Date(season.archived_at).toLocaleDateString()}</div>
@@ -1397,24 +1397,24 @@ function showSeasonView(season) {
 
 function renderHistoryView() {
   const el = document.getElementById('history-container');
-  if (!state.seasons.length) { el.innerHTML = '<div class="empty-state"><span class="ei">📚</span><h3>No History Yet</h3><p>Archive a season to see it here.</p></div>'; return; }
+  if (!state.seasons.length) { el.innerHTML = '<div class="empty-state"><span class="ei"></span><h3>No History Yet</h3><p>Archive a season to see it here.</p></div>'; return; }
   el.innerHTML = '<div class="season-history-grid">' + [...state.seasons].reverse().map(s => `
     <div class="season-hist-card" onclick="showSeasonView(state.seasons.find(x=>x.id==${s.id}))">
       <div class="season-hist-num">S${s.season}</div>
       <div class="season-hist-name">${s.name}</div>
-      ${s.champion ? `<div class="season-hist-champion"><span class="trophy">🏆</span>${s.champion}</div>` : '<div style="font-size:12px;color:var(--muted)">No champion recorded</div>'}
+      ${s.champion ? `<div class="season-hist-champion"><span class="trophy"></span>${s.champion}</div>` : '<div style="font-size:12px;color:var(--muted)">No champion recorded</div>'}
       <div class="season-hist-meta">${s.players?.length||0} players · ${s.groups?.length||0} groups · ${new Date(s.archived_at).toLocaleDateString()}</div>
     </div>`).join('') + '</div>';
 }
 
 function renderSeasonsAdmin() {
   const el = document.getElementById('seasons-admin-list');
-  if (!state.seasons.length) { el.innerHTML = '<div class="empty-state" style="padding:20px"><span class="ei" style="font-size:28px">📚</span><p>No archived seasons</p></div>'; return; }
+  if (!state.seasons.length) { el.innerHTML = '<div class="empty-state" style="padding:20px"><span class="ei" style="font-size:28px"></span><p>No archived seasons</p></div>'; return; }
   el.innerHTML = [...state.seasons].reverse().map(s => `
     <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.04);">
       <div style="font-family:var(--ff-title);font-size:28px;letter-spacing:.1em;color:var(--white);min-width:50px">S${s.season}</div>
       <div style="flex:1"><div style="font-family:var(--ff-ui);font-size:14px;font-weight:700">${s.name}</div>
-        ${s.champion?`<div style="font-family:var(--ff-hud);font-size:9px;color:var(--gold2)">🏆 ${s.champion}</div>`:''}
+        ${s.champion?`<div style="font-family:var(--ff-hud);font-size:9px;color:var(--gold2)"> ${s.champion}</div>`:''}
         <div style="font-family:var(--ff-hud);font-size:8px;color:var(--muted)">${new Date(s.archived_at).toLocaleDateString()}</div>
       </div>
       <button class="btn btn-ghost btn-xs" onclick="showSeasonView(state.seasons.find(x=>x.id==${s.id}))">View</button>
