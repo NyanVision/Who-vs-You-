@@ -1880,3 +1880,68 @@ body {
   .hero { grid-template-columns: 46px minmax(0,1fr); }
   .nav-btn { font-size: 10px; }
 }
+
+
+/* WVY public competition navigation */
+.public-section-head{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+  margin:22px 0 16px;padding-bottom:12px;border-bottom:1px solid var(--v2-line);
+}
+.public-kicker{
+  margin-bottom:3px;color:var(--v2-red);font:700 9px/1 var(--ff-ui);
+  letter-spacing:.14em;text-transform:uppercase;
+}
+.public-section-head h2{
+  margin:0;color:#fff;font:700 30px/.95 var(--ff-title);letter-spacing:.02em;
+}
+.public-section-meta{
+  color:#747b85;font:600 10px/1 var(--ff-ui);letter-spacing:.04em;
+}
+.public-match-group{
+  margin-bottom:16px;border:1px solid var(--v2-line);border-radius:8px;
+  overflow:hidden;background:var(--v2-surface);
+}
+.public-match-group-head{
+  min-height:48px;padding:0 14px;display:flex;align-items:center;justify-content:space-between;
+  gap:12px;border-bottom:1px solid var(--v2-line);background:var(--v2-surface-2);
+}
+.public-match-group-head h3{
+  margin:0;color:#fff;font:700 19px/1 var(--ff-title);letter-spacing:.01em;
+}
+.public-match-group-head span{
+  color:#707782;font:600 9px/1 var(--ff-ui);text-transform:uppercase;letter-spacing:.07em;
+}
+.public-round{padding:12px 12px 4px;border-bottom:1px solid var(--v2-line-soft)}
+.public-round:last-child{border-bottom:0}
+.public-round-label{
+  margin:0 0 8px;color:#6f7680;font:600 9px/1 var(--ff-ui);
+  text-transform:uppercase;letter-spacing:.09em;
+}
+#stage-fixtures .fixture-card,#stage-results .fixture-card{box-shadow:none}
+#stage-results .score-shown{color:#fff}
+#stage-results .fixture-card.played{opacity:1}
+
+@media (max-width:760px){
+  .top-nav{
+    display:flex!important;
+    grid-template-columns:none!important;
+    overflow-x:auto;
+    justify-content:flex-start;
+    gap:3px;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+  }
+  .top-nav::-webkit-scrollbar{display:none}
+  .nav-btn{
+    width:auto!important;
+    min-width:max-content!important;
+    flex:0 0 auto;
+    padding:0 15px;
+  }
+  .public-section-head{margin-top:18px}
+  .public-section-head h2{font-size:27px}
+  .standings-table{min-width:620px}
+  .group-body{overflow-x:auto}
+  .public-match-group{border-radius:7px}
+  .public-round{padding:10px 8px 3px}
+}
