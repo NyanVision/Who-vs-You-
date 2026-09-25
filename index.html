@@ -22,8 +22,16 @@
 <div class="bg-layer bg-particles" id="particles"></div> <!-- ═══ TOAST CONTAINER ═══ -->
 <div id="toast-container"></div> <!-- ═══ HEADER ═══ -->
 <div id="app-header"> <div class="hero"> <div class="cbr cbr-tl"></div> <div class="cbr cbr-tr"></div> <div class="cbr cbr-bl"></div> <div class="cbr cbr-br"></div> <div class="logo-wrap"> <img id="logo-img" class="tournament-logo" src="tournament-logo.png" alt="Tournament Logo"
-        onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='block'"> <div id="logo-fallback">WVY</div> </div> <div class="site-title" id="site-title">Who vs You?</div> <div class="title-slash"></div> <div class="season-badge" id="season-badge">Season 5</div> <div class="top-nav"> <img class="nav-tournament-logo tournament-logo" src="tournament-logo.png" alt="Tournament Logo"> <button class="nav-btn active" id="nav-public" onclick="showView('public')"> Tournament</button> <button class="nav-btn gold-btn" id="nav-admin" onclick="toggleAdmin()"> Admin</button> </div> </div>
-</div> <!-- ═══════════════════════════════════════════
+        onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='block'"> <div id="logo-fallback">WVY</div> </div> <div class="site-title" id="site-title">Who vs You?</div> <div class="title-slash"></div> <div class="season-badge" id="season-badge">Season 5</div> <div class="top-nav">
+    <button class="nav-btn active" id="nav-groups" onclick="showPublicSection('groups')">Groups</button>
+    <button class="nav-btn" id="nav-fixtures" onclick="showPublicSection('fixtures')">Fixtures</button>
+    <button class="nav-btn" id="nav-results" onclick="showPublicSection('results')">Results</button>
+    <button class="nav-btn" id="nav-knockout" onclick="showPublicSection('knockout')">Knockout</button>
+    <button class="nav-btn gold-btn" id="nav-admin" onclick="toggleAdmin()">Admin</button>
+  </div>
+</div>
+</div>
+<!-- ═══════════════════════════════════════════
      PUBLIC VIEW
 ═══════════════════════════════════════════ -->
 <div id="view-public" class="section visible fade-in"> <div style="max-width:1300px;margin:0 auto;padding:24px 16px 80px;position:relative;z-index:1;"> <!-- Status Bar -->
@@ -40,7 +48,19 @@
       </div>
     </div>
 
-    <!-- Champion Display (shown when final is played) --> <div id="champion-display" style="display:none;margin-bottom:20px;"></div> <!-- Stage Tabs --> <div id="stage-tabs" class="stage-tabs" style="display:none"> <button class="stage-tab active" id="tab-group" onclick="showStage('group')">Group Stage</button> <button class="stage-tab" id="tab-ko" onclick="showStage('ko')">Knockout</button> <button class="stage-tab" id="tab-history" onclick="showStage('history')">Season History</button> </div> <!-- Group Stage --> <div id="stage-group" class="fade-in"> <div id="groups-container">
+    <!-- Champion Display (shown when final is played) -->
+    <div id="champion-display" style="display:none;margin-bottom:20px;"></div>
+
+    <div class="public-section-head">
+      <div>
+        <div class="public-kicker">Who vs You</div>
+        <h2 id="public-section-title">Groups</h2>
+      </div>
+      <div id="public-section-meta" class="public-section-meta"></div>
+    </div>
+
+    <!-- Groups -->
+    <div id="stage-group" class="fade-in"> <div id="groups-container">
         <div class="empty-state">
           <img class="empty-state-logo tournament-logo" src="tournament-logo.png" alt="">
           <h3>Tournament setup pending</h3>
@@ -49,8 +69,19 @@
       </div>
     </div>
 
-    <!-- Knockout Stage --> <div id="stage-ko" style="display:none" class="fade-in"> <div class="ko-tabs" id="ko-round-tabs"></div> <div id="ko-matches-container"></div> <div class="card" style="margin-top:18px"> <div class="card-title">Bracket <span class="acc">Overview</span></div> <div class="bracket-wrap"><div class="bracket" id="bracket-display"></div></div> </div> </div> <!-- Season History --> <div id="stage-history" style="display:none" class="fade-in"> <div id="history-container"> <div class="empty-state"> <span class="ei"></span> <h3>No History Yet</h3> <p>Previous seasons will appear here.</p> </div> </div> </div> </div>
-</div> <!-- ═══════════════════════════════════════════
+    <!-- Fixtures -->
+    <div id="stage-fixtures" style="display:none" class="fade-in">
+      <div id="public-fixtures-container"></div>
+    </div>
+
+    <!-- Results -->
+    <div id="stage-results" style="display:none" class="fade-in">
+      <div id="public-results-container"></div>
+    </div>
+
+    <!-- Knockout Stage --> <div id="stage-ko" style="display:none" class="fade-in"> <div class="ko-tabs" id="ko-round-tabs"></div> <div id="ko-matches-container"></div> <div class="card" style="margin-top:18px"> <div class="card-title">Bracket <span class="acc">Overview</span></div> <div class="bracket-wrap"><div class="bracket" id="bracket-display"></div></div> </div> </div> </div>
+</div>
+<!-- ═══════════════════════════════════════════
      ADMIN VIEW
 ═══════════════════════════════════════════ -->
 <div id="view-admin" class="section"> <!-- Admin Login --> <div id="admin-login" style="max-width:400px;margin:50px auto;padding:20px;position:relative;z-index:1;"> <div class="card"> <div class="card-title"><span class="acc">Admin</span> Login</div> <div class="form-group"> <label class="form-label">Password</label> <input type="password" id="admin-password" class="form-input" placeholder="Enter password"
