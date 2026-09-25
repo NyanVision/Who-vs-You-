@@ -394,98 +394,109 @@ function renderTournamentInfo() {
 
 /* ─── PLAYERS ─── */
 function renderPlayerList() {
-  const c = document.getElementById('player-list');
-  if (!c) return; // not in admin panel view yet
-  c.innerHTML = '';
-  state.players.forEach((p, i) => {
-    const tag = document.createElement('div');
-    tag.className = 'player-tag player-photo-tag';
-    tag.innerHTML = `${playerAvatarHtml(p)}<span>${p.name}</span><button class="remove-btn" onclick="removePlayer(${i})"></button>`;
+  const c=document.getElementById('player-list');
+  if(!c) return;
+  c.innerHTML='';
+  state.players.forEach(function(p,i){
+    const tag=document.createElement('div');
+    tag.className='player-tag player-photo-tag';
+    tag.innerHTML=playerAvatarHtml(p)+'<span>'+p.name+'</span><button class="remove-btn" onclick="removePlayer('+i+')"></button>';
     c.appendChild(tag);
   });
-  const pc = document.getElementById('player-count');
-  if (pc) pc.textContent = state.players.length;
+  const pc=document.getElementById('player-count');
+  if(pc) pc.textContent=state.players.length;
+}
+function requireAdminAuth() {
+  const pb=getPB();
+  if(!pb || !pb.authStore || !pb.authStore.isValid) {
+    toast('Admin authentication required','warning');
+    return false;
+  }
+  return true;
 }
 async function addPlayer() {
-  const input = document.getElementById('player-name-input');
-  const photoInput = document.getElementById('player-photo-input');
-  const name = input.value.trim(); if (!name) return;
-  if (state.players.find(p => p.name.toLowerCase() === name.toLowerCase())) { toast('Player already exists', 'warning'); return; }
-
-  if (!state.localMode && state.pocketbase) {
-    try {
-      const formData = new FormData();
-      formData.append('name', name);
-      if (photoInput?.files?.[0]) formData.append('photo', photoInput.files[0]);
-      const created = await getPB().collection('players').create(formData);
-      state.players.push(normalizePlayerRecord(created));
-      saveLocal('players', state.players);
-      input.value = '';
-      if (photoInput) photoInput.value = '';
-      renderPlayerList();
-      updateDashboard();
-      toast('Player saved to PocketBase!', 'success');
-      return;
-    } catch (error) {
-      console.error('PocketBase addPlayer error:', error);
-      toast('PocketBase save failed (' + (error.message || 'unknown') + '). Saved locally instead.', 'warning');
-    }
+  const input=document.getElementById('player-name-input');
+  const photoInput=document.getElementById('player-photo-input');
+  const name=input.value.trim();
+  if(!name) return;
+  if(state.players.find(function(p){return p.name.toLowerCase()===name.toLowerCase();})){
+    toast('Player already exists','warning');
+    return;
   }
-
-  const photo = await readImageFile(photoInput?.files?.[0]);
-  state.players.push({ id: Date.now(), name, photo });
-  saveLocal('players', state.players);
-  input.value = '';
-  if (photoInput) photoInput.value = '';
-  renderPlayerList();
-  updateDashboard();
-  toast('Player added locally!', 'success');
+  if(!requireAdminAuth()) return;
+  try {
+    const formData=new FormData();
+    formData.append('name',name);
+    if(photoInput && photoInput.files && photoInput.files[0]) formData.append('photo',photoInput.files[0]);
+    const created=await getPB().collection('players').create(formData);
+    state.players.push(normalizePlayerRecord(created));
+    saveLocal('players',state.players);
+    input.value='';
+    if(photoInput) photoInput.value='';
+    renderPlayerList();
+    updateDashboard();
+    toast('Player saved','success');
+  } catch(error) {
+    console.error('Player save failed:',error);
+    toast('Could not save player','warning');
+  }
 }
 async function bulkAddPlayers() {
-  const lines = document.getElementById('bulk-players').value.split('\n').map(l => l.trim()).filter(Boolean);
-  const unique = lines.filter(name => !state.players.find(p => p.name.toLowerCase() === name.toLowerCase()));
-
-  if (!state.localMode && state.pocketbase) {
-    let added = 0;
-    for (const name of unique) {
-      try {
-        const fd = new FormData();
-        fd.append('name', name);
-        const created = await getPB().collection('players').create(fd);
-        state.players.push(normalizePlayerRecord(created));
-        added++;
-      } catch (error) { console.error('Bulk player PB failed:', name, error); }
+  if(!requireAdminAuth()) return;
+  const lines=document.getElementById('bulk-players').value.split('\n').map(function(v){return v.trim();}).filter(Boolean);
+  const unique=lines.filter(function(name){
+    return !state.players.find(function(p){return p.name.toLowerCase()===name.toLowerCase();});
+  });
+  let added=0;
+  for(const name of unique){
+    try {
+      const created=await getPB().collection('players').create({name:name});
+      state.players.push(normalizePlayerRecord(created));
+      added++;
+    } catch(error) {
+      console.error('Bulk player save failed:',name,error);
     }
-    saveLocal('players', state.players);
-    toast(`Added ${added} of ${unique.length} players to PocketBase!`, 'success');
-  } else {
-    unique.forEach(name => state.players.push({id: Date.now() + Math.random(), name, photo:''}));
-    saveLocal('players', state.players);
-    toast(`Added ${unique.length} players!`, 'success');
   }
-
-  document.getElementById('bulk-players').value = '';
+  saveLocal('players',state.players);
+  document.getElementById('bulk-players').value='';
   renderPlayerList();
   updateDashboard();
+  toast('Added '+added+' players',added===unique.length?'success':'warning');
 }
-function removePlayer(i) { state.players.splice(i,1); renderPlayerList(); }
-async function clearAllPlayers() {
-  if (!confirm('Clear all players?')) return;
-  if (!state.localMode && state.pocketbase) {
-    try { await clearPocketBaseCollection('players'); } catch (e) { console.error(e); }
+async function removePlayer(i) {
+  if(!requireAdminAuth()) return;
+  const player=state.players[i];
+  if(!player) return;
+  try {
+    if(/^[a-z0-9]{15}$/i.test(String(player.id))) await getPB().collection('players').delete(player.id);
+    state.players.splice(i,1);
+    saveLocal('players',state.players);
+    renderPlayerList();
+    updateDashboard();
+  } catch(error) {
+    console.error('Player removal failed:',error);
+    toast('Could not remove player','warning');
   }
-  state.players=[];
-  await saveData('players', state.players);
-  renderPlayerList();
+}
+async function clearAllPlayers() {
+  if(!confirm('Clear all players?')) return;
+  if(!requireAdminAuth()) return;
+  try {
+    await clearPocketBaseCollection('players');
+    state.players=[];
+    saveLocal('players',state.players);
+    renderPlayerList();
+    updateDashboard();
+    toast('Players cleared','success');
+  } catch(error) {
+    console.error('Clear players failed:',error);
+    toast('Could not clear players','warning');
+  }
 }
 async function savePlayers() {
-  await saveData('players', state.players);
-  if (state.localMode || !state.pocketbase) {
-    toast('Players saved locally!', 'success');
-  } else {
-    toast('Players synced to PocketBase!', 'success');
-  }
-  renderPlayerList();
+  if(!requireAdminAuth()) return;
+  saveLocal('players',state.players);
+  toast('Players are synced to PocketBase','success');
 }
 
 /* ─── GROUPS ─── */
