@@ -1309,9 +1309,32 @@ async function clearMatchLog() {
 }
 async function deleteTournament() {
   if (!confirm('Delete entire tournament? This cannot be undone!')) return;
-  state.tournament=null; state.players=[]; state.groups=[]; state.fixtures=[]; state.knockout=[]; state.matchLog=[];
-  ['tournaments','players','groups','fixtures','knockout_matches','match_log'].forEach(k=>{ if(state.localMode) localStorage.removeItem('wvy_'+k); });
-  renderAll(); closeModal('modal-danger'); toast('Tournament deleted','success');
+  if (!requireAdminAuth()) return;
+  try {
+    await clearPocketBaseCollection('players');
+    state.tournament=null;
+    state.players=[];
+    state.groups=[];
+    state.fixtures=[];
+    state.knockout=[];
+    state.matchLog=[];
+    state.seasons=[];
+
+    await saveData('tournaments',null);
+    await saveData('groups',[]);
+    await saveData('fixtures',[]);
+    await saveData('knockout_matches',[]);
+    await saveData('match_log',[]);
+    await saveData('seasons',[]);
+    saveLocal('players',[]);
+
+    renderAll();
+    closeModal('modal-danger');
+    toast('Tournament deleted','success');
+  } catch(error) {
+    console.error('Delete tournament failed:',error);
+    toast('Could not delete tournament','warning');
+  }
 }
 
 /* ─── CHANGE SEASON ─── */
