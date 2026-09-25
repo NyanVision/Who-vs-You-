@@ -1,14 +1,14 @@
 /* ═══════════════════════════════════════════
    WHO VS YOU? — TOURNAMENT ENGINE v3.0
    script.js
-   Password: zayyarkyaw35
+
 ═══════════════════════════════════════════ */
-const ADMIN_PASS = 'zayyarkyaw35';
 const GROUP_LETTERS = 'ABCDEFGHIJKLMNOP'.split('');
 const KO_ROUNDS = ['R32','R16','QF','SF','F'];
 const KO_LABELS = {R32:'Round of 32',R16:'Round of 16',QF:'Quarter Final',SF:'Semi Final',F:'Final'};
 const TOURNAMENT_LOGO = 'tournament-logo.png';
-const PB_DEFAULT_URL = 'http://127.0.0.1:8090';
+const PB_DEFAULT_URL = 'https://pocketbase-production-9b4f.up.railway.app';
+const ADMIN_EMAIL = 'admin@wvy.local';
 
 let state = {
   tournament: null,
@@ -23,7 +23,6 @@ let state = {
   currentKoRound: 'R16',
   pocketbase: null,
   pocketbaseUrl: PB_DEFAULT_URL,
-  supabase: null,
   localMode: false,
   adminLoggedIn: false,
   koLegs: 1,
@@ -77,249 +76,105 @@ function switchSection(id) {
   if (id === 'tournament') renderTournamentInfo();
 }
 
-/* ─── DATA LAYER — POCKETBASE + LOCAL FALLBACK ─── */
-const PB_COLLECTIONS = {
-  players: 'players',
-  groups: 'groups',
-  fixtures: 'fixtures',
-  knockout_matches: 'knockout'
-};
-
+/* ─── DATA LAYER — HOSTED POCKETBASE ─── */
 function getPB() {
   if (!state.pocketbase && typeof PocketBase !== 'undefined') {
-    state.pocketbase = new PocketBase(state.pocketbaseUrl || PB_DEFAULT_URL);
+    state.pocketbase = new PocketBase(PB_DEFAULT_URL);
+    state.pocketbaseUrl = PB_DEFAULT_URL;
   }
   return state.pocketbase;
 }
-
-async function clearPocketBaseCollection(collection) {
-  const pb = getPB();
-  try {
-    const records = await pb.collection(collection).getFullList({ fields: 'id', perPage: 2000 });
-    for (const r of records) {
-      try { await pb.collection(collection).delete(r.id); }
-      catch(e) { console.warn('Could not delete record', r.id, e.message); }
-    }
-  } catch(e) {
-    console.error('clearPocketBaseCollection failed for', collection, e);
-    throw e;
-  }
-}
-
-function normalizePlayerRecord(record) {
-  let photoUrl = '';
-  if (record.photo) {
-    try {
-      // getPB().baseURL is always the correct base, even during init
-      const pb = getPB();
-      const base = (pb && pb.baseURL ? pb.baseURL : state.pocketbaseUrl || PB_DEFAULT_URL).replace(/\/$/, '');
-      photoUrl = base + '/api/files/' + record.collectionId + '/' + record.id + '/' + record.photo;
-    } catch(e) { photoUrl = ''; }
-  }
-  return {
-    id: record.id,
-    name: record.name || record.username || '?',
-    photo: photoUrl,
-    photoFile: record.photo || ''
-  };
-}
-
-function toPocketFixture(f) {
-  return {
-    group: String(f.group_id || f.group || ''),
-    round: Number(f.round || 1),
-    home: f.home || null,
-    away: f.away || null,
-    home_score: f.home_score === null || f.home_score === undefined ? null : Number(f.home_score),
-    away_score: f.away_score === null || f.away_score === undefined ? null : Number(f.away_score),
-    played: !!f.played
-  };
-}
-
-function fromPocketFixture(r) {
-  return {
-    id: r.id,
-    group_id: r.group,
-    stage: 'group',
-    round: r.round || 1,
-    home: r.home,
-    away: r.away,
-    home_score: r.home_score ?? null,
-    away_score: r.away_score ?? null,
-    played: !!r.played
-  };
-}
-
-function toPocketKnockout(f) {
-  return {
-    round: f.round,
-    home: f.home || null,
-    away: f.away || null,
-    home_score: f.home_score === null || f.home_score === undefined ? null : Number(f.home_score),
-    away_score: f.away_score === null || f.away_score === undefined ? null : Number(f.away_score),
-    played: !!f.played
-  };
-}
-
 function saveLocal(key, value) {
   localStorage.setItem('wvy_' + key, JSON.stringify(value));
   return { data: value, error: null };
 }
-
+function loadLocal(key) {
+  const raw = localStorage.getItem('wvy_' + key);
+  return raw ? JSON.parse(raw) : null;
+}
+async function connectHostedPocketBase() {
+  if (typeof PocketBase === 'undefined') throw new Error('PocketBase SDK unavailable');
+  state.pocketbase = new PocketBase(PB_DEFAULT_URL);
+  state.pocketbaseUrl = PB_DEFAULT_URL;
+  await Promise.race([
+    state.pocketbase.health.check(),
+    new Promise(function(_, reject){ setTimeout(function(){ reject(new Error('Connection timed out')); }, 8000); })
+  ]);
+  state.localMode = false;
+  return state.pocketbase;
+}
+async function clearPocketBaseCollection(collection) {
+  const pb = getPB();
+  if (!pb || !pb.authStore || !pb.authStore.isValid) throw new Error('Admin authentication required');
+  const records = await pb.collection(collection).getFullList({ fields: 'id', perPage: 2000 });
+  for (const record of records) await pb.collection(collection).delete(record.id);
+}
+function normalizePlayerRecord(record) {
+  let photoUrl = '';
+  if (record.photo) {
+    try { photoUrl = getPB().files.getURL(record, record.photo); } catch(e) {}
+  }
+  return { id:record.id, name:record.name||'?', photo:photoUrl, photoFile:record.photo||'' };
+}
+async function getAppStateRecord(key) {
+  const result = await getPB().collection('app_state').getList(1,1,{ filter:'key="' + key + '"' });
+  return result.items[0] || null;
+}
+async function saveAppState(key, value) {
+  const pb = getPB();
+  if (!pb || !pb.authStore || !pb.authStore.isValid) throw new Error('Admin authentication required');
+  const existing = await getAppStateRecord(key);
+  if (existing) await pb.collection('app_state').update(existing.id,{value:value});
+  else await pb.collection('app_state').create({key:key,value:value});
+}
 async function saveData(key, value) {
-  // Always keep a local backup so advanced fields like legs, winners, logs, and seasons are safe.
-  saveLocal(key, value);
-
-  if (state.localMode || !state.pocketbase) return { data: value, error: null };
-
+  saveLocal(key,value);
   try {
+    if (!state.pocketbase) await connectHostedPocketBase();
     if (key === 'players') {
-      // Sync players that were added locally (their id is a number, not a 15-char PocketBase id)
-      const pbIdPattern = /^[a-z0-9]{15}$/i;
-      let syncCount = 0;
-      for (const p of value) {
-        if (!pbIdPattern.test(String(p.id))) {
-          try {
-            const fd = new FormData();
-            fd.append('name', p.name);
-            const created = await getPB().collection('players').create(fd);
-            p.id = created.id; // update local id to PocketBase id
-            syncCount++;
-            console.log('Synced player to PB:', p.name, created.id);
-          } catch(e) {
-            console.error('Player sync to PB failed:', p.name, e);
-            toast('Failed to sync player "' + p.name + '": ' + (e.message || e), 'warning');
-          }
-        }
-      }
-      saveLocal('players', value); // keep local copy updated with new PB ids
-      console.log('saveData players: synced', syncCount, 'new players to PocketBase');
-      return { data: value, error: null };
+      return { data:value, error:null };
     }
-
-    if (key === 'groups') {
-      await clearPocketBaseCollection('groups');
-      for (const g of value) {
-        await getPB().collection('groups').create({
-          name: g.name,
-          players: (g.players || []).map(String)
-        });
-      }
-      return { data: value, error: null };
-    }
-
-    if (key === 'fixtures') {
-      await clearPocketBaseCollection('fixtures');
-      for (const f of value.filter(x => x.stage === 'group')) {
-        await getPB().collection('fixtures').create(toPocketFixture(f));
-      }
-      return { data: value, error: null };
-    }
-
-    if (key === 'knockout_matches') {
-      await clearPocketBaseCollection('knockout');
-      for (const f of value) {
-        await getPB().collection('knockout').create(toPocketKnockout(f));
-      }
-      return { data: value, error: null };
-    }
-
-    // tournaments, seasons, match_log stay in localStorage unless you create collections for them.
-    return { data: value, error: null };
-  } catch (error) {
-    console.error('PocketBase save failed:', key, error);
-    toast('PocketBase save failed. Local backup saved.', 'warning');
-    return { data: value, error };
+    await saveAppState(key,value);
+    state.localMode=false;
+    return { data:value, error:null };
+  } catch(error) {
+    console.error('PocketBase save failed:',key,error);
+    state.localMode=true;
+    toast('Backend save failed. Browser backup kept, but this change is not synced.','warning');
+    return { data:value, error:error };
   }
 }
-
 async function loadData(key) {
-  if (state.localMode || !state.pocketbase) {
-    const d = localStorage.getItem('wvy_' + key);
-    return d ? JSON.parse(d) : null;
-  }
-
   try {
+    if (!state.pocketbase) await connectHostedPocketBase();
     if (key === 'players') {
-      // sort:'+created' is safer; some PB versions need the + prefix
-      // perPage:500 ensures we get all records even with large collections
-      const records = await getPB().collection('players').getFullList({ sort: '+created', perPage: 500 });
-      console.log('PB players loaded:', records.length, records);
+      const records = await getPB().collection('players').getFullList({sort:'+created',perPage:500});
       const normalized = records.map(normalizePlayerRecord);
-      console.log('Normalized players:', normalized);
-      // Also save to local backup so offline fallback works
-      saveLocal('players', normalized);
+      saveLocal('players',normalized);
       return normalized;
     }
-
-    if (key === 'groups') {
-      const records = await getPB().collection('groups').getFullList({ sort: '+created', perPage: 100 });
-      console.log('PB groups loaded:', records.length, records);
-      return records.map(r => ({
-        id: r.name,
-        name: r.name,
-        players: Array.isArray(r.players) ? r.players : []
-      }));
-    }
-
-    if (key === 'fixtures') {
-      const records = await getPB().collection('fixtures').getFullList({ sort: '+created', perPage: 2000 });
-      console.log('PB fixtures loaded:', records.length);
-      return records.map(fromPocketFixture);
-    }
-
-    // Keep advanced knockout state from localStorage so match_num, legs, winners, and leg_results stay complete.
-    const d = localStorage.getItem('wvy_' + key);
-    return d ? JSON.parse(d) : null;
-  } catch (error) {
-    console.error('PocketBase load failed:', key, error);
-    const d = localStorage.getItem('wvy_' + key);
-    return d ? JSON.parse(d) : null;
+    const record = await getAppStateRecord(key);
+    const value = record ? record.value : null;
+    if (value !== null && value !== undefined) saveLocal(key,value);
+    return value;
+  } catch(error) {
+    console.error('PocketBase load failed:',key,error);
+    state.localMode=true;
+    return loadLocal(key);
   }
 }
-
 async function connectPocketBase() {
-  const url = (document.getElementById('pb-url')?.value || PB_DEFAULT_URL).trim().replace(/\/$/, '');
-  if (!url) { toast('Enter PocketBase URL', 'warning'); return; }
   try {
-    state.pocketbaseUrl = url;
-    state.pocketbase = new PocketBase(url);
-    toast('Connecting to PocketBase…', 'info');
-    await Promise.race([
-      state.pocketbase.health.check(),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('Connection timed out after 8s')), 8000))
-    ]);
-    state.localMode = false;
-    localStorage.setItem('wvy_pb_url', url);
-    document.getElementById('pocketbase-config-card').style.display = 'none';
-    setAdminStatus('green', 'Connected: ' + url);
-    toast('Connected to PocketBase!', 'success');
+    await connectHostedPocketBase();
+    setAdminStatus('green','Hosted PocketBase connected');
     await loadAll();
-  } catch(e) {
-    console.error('PocketBase connect error:', e);
-    state.pocketbase = null;
-    state.localMode = true;
-    setAdminStatus('red', 'Connection failed — using Local Mode');
-    let msg = 'PocketBase connection failed: ' + (e.message || 'unknown error');
-    if (e.message === 'Failed to fetch' || e.message?.includes('fetch')) {
-      msg += '. Check: Is PocketBase running? Is CORS enabled in PocketBase → Settings → Application?';
-    }
-    toast(msg, 'warning');
-    await loadAll();
+  } catch(error) {
+    setAdminStatus('red','PocketBase unavailable');
+    toast('PocketBase is currently unavailable','warning');
   }
 }
-
-// Backward-compatible alias if any old button still exists.
-async function connectSupabase() { return connectPocketBase(); }
-
 function useLocalMode() {
-  state.localMode = true;
-  state.pocketbase = null;
-  const card = document.getElementById('pocketbase-config-card');
-  if (card) card.style.display = 'none';
-  setAdminStatus('gold', 'Local Mode (browser storage)');
-  toast('Using local mode', 'warning');
-  loadAll();
+  toast('Who vs You uses the hosted PocketBase backend.','info');
 }
 
 /* ─── LOAD ALL ─── */
@@ -479,18 +334,24 @@ function readImageFile(file) {
 }
 
 /* ─── ADMIN LOGIN ─── */
-function adminLogin() {
-  if (document.getElementById('admin-password').value === ADMIN_PASS) {
-    state.adminLoggedIn = true;
-    document.getElementById('admin-login').style.display = 'none';
-    document.getElementById('admin-panel').style.display = 'block';
-    const savedPbUrl = localStorage.getItem('wvy_pb_url') || PB_DEFAULT_URL;
-    const pbUrlInput = document.getElementById('pb-url');
-    if (pbUrlInput) pbUrlInput.value = savedPbUrl;
-    const card = document.getElementById('pocketbase-config-card');
-    if (card && !state.localMode && state.pocketbase) card.style.display = 'none';
-    loadAll();
-  } else { toast('Wrong password!'); }
+async function adminLogin() {
+  const input=document.getElementById('admin-password');
+  const password=input ? input.value : '';
+  if(!password){ toast('Enter the admin password','warning'); return; }
+  try {
+    if(!state.pocketbase) await connectHostedPocketBase();
+    await getPB().collection('admins').authWithPassword(ADMIN_EMAIL,password);
+    state.adminLoggedIn=true;
+    state.localMode=false;
+    document.getElementById('admin-login').style.display='none';
+    document.getElementById('admin-panel').style.display='block';
+    if(input) input.value='';
+    setAdminStatus('green','Hosted PocketBase connected');
+    await loadAll();
+  } catch(error) {
+    console.error('Admin login failed:',error);
+    toast('Incorrect password or backend unavailable','warning');
+  }
 }
 
 /* ─── TOURNAMENT CREATION ─── */
@@ -1492,34 +1353,16 @@ function toast(msg, type='error') {
 }
 
 /* ─── INIT ─── */
-window.addEventListener('load', async () => {
+window.addEventListener('load', async function(){
   spawnParticles();
-  const savedPbUrl = localStorage.getItem('wvy_pb_url') || PB_DEFAULT_URL;
-  state.pocketbaseUrl = savedPbUrl;
-  const pbUrlInput = document.getElementById('pb-url');
-  if (pbUrlInput) pbUrlInput.value = savedPbUrl;
-
-  // Try PocketBase first. If it is not running, the site falls back to Local Mode.
-  if (typeof PocketBase !== 'undefined') {
-    try {
-      state.pocketbase = new PocketBase(savedPbUrl);
-      // 5-second timeout so page never hangs if PocketBase is unreachable
-      await Promise.race([
-        state.pocketbase.health.check(),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
-      ]);
-      state.localMode = false;
-      const card = document.getElementById('pocketbase-config-card');
-      if (card) card.style.display = 'none';
-      setAdminStatus('green', 'Connected to PocketBase: ' + savedPbUrl);
-    } catch (e) {
-      state.pocketbase = null;
-      state.localMode = true;
-      setAdminStatus('gold', 'Local Mode — PocketBase not reachable (' + e.message + ')');
-    }
-  } else {
-    state.localMode = true;
-    setAdminStatus('gold', 'Local Mode (no PocketBase SDK)');
+  try {
+    await connectHostedPocketBase();
+    setAdminStatus('green','Hosted PocketBase connected');
+  } catch(error) {
+    console.error('PocketBase startup connection failed:',error);
+    state.pocketbase=null;
+    state.localMode=true;
+    setAdminStatus('red','PocketBase temporarily unavailable');
   }
-  loadAll();
+  await loadAll();
 });
