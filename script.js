@@ -287,9 +287,14 @@ function renderRecentActivity() {
 function showView(v) {
   document.getElementById('view-public').classList.toggle('visible', v === 'public');
   document.getElementById('view-admin').classList.toggle('visible', v === 'admin');
+
+  ['groups','fixtures','results','knockout'].forEach(function(section){
+    const el=document.getElementById('nav-'+section);
+    if(el) el.classList.toggle('active', v === 'public' && state.currentStage === section);
+  });
+
   const adminBtn=document.getElementById('nav-admin');
   if(adminBtn) adminBtn.classList.toggle('active', v === 'admin');
-  if(v === 'public') updatePublicNav();
 }
 function toggleAdmin() {
   const isAdmin = document.getElementById('view-admin').classList.contains('visible');
