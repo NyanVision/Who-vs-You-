@@ -380,7 +380,7 @@ function setAdminStatus(c, t) {
   document.getElementById('admin-status-text').textContent = t;
 }
 function updateStatusBar() {
-  if (!state.tournament) { setStatus('red', 'No tournament – Admin needs to create one'); return; }
+  if (!state.tournament) { setStatus('red', 'Tournament setup pending'); return; }
   const season = state.tournament.season || 5;
   const sb = document.getElementById('season-badge'); if (sb) sb.textContent = 'Season ' + season;
   const sbt = document.getElementById('sb-season-txt'); if (sbt) sbt.textContent = 'Season ' + season;
@@ -1238,8 +1238,8 @@ function renderPublicView() {
 
 function renderGroupStage() {
   const c = document.getElementById('groups-container');
-  if (!state.tournament) { c.innerHTML = '<div class="empty-state"><span class="ei"></span><h3>No Tournament</h3><p>Admin creates the tournament.</p></div>'; return; }
-  if (state.groups.every(g => !g.players || !g.players.length)) { c.innerHTML = '<div class="empty-state"><span class="ei"></span><h3>Waiting for Setup</h3><p>Admin is setting up groups.</p></div>'; return; }
+  if (!state.tournament) { c.innerHTML = '<div class="empty-state"><img class="empty-state-logo tournament-logo" src="tournament-logo.png" alt=""><h3>Tournament setup pending</h3><p>Competition details will appear here once they are published.</p></div>'; return; }
+  if (state.groups.every(g => !g.players || !g.players.length)) { c.innerHTML = '<div class="empty-state"><img class="empty-state-logo tournament-logo" src="tournament-logo.png" alt=""><h3>Groups are being prepared</h3><p>Standings and fixtures will appear here when the draw is complete.</p></div>'; return; }
   c.innerHTML = '<div class="groups-grid">' + state.groups.map(g => {
     if (!g.players || !g.players.length) return '';
     const sorted = getSortedStandings(g.id);
@@ -1350,7 +1350,7 @@ async function archiveCurrentSeason() {
 function renderSeasonDropdown() {
   const sel = document.getElementById('public-season-select');
   const current = document.createElement('option');
-  current.value = 'current'; current.textContent = `Current (S${state.tournament?.season||'?'})`;
+  current.value = 'current'; current.textContent = state.tournament?.season ? `Season ${state.tournament.season} · Current` : 'Current';
   sel.innerHTML = '';
   sel.appendChild(current);
   [...state.seasons].reverse().forEach(s => {
