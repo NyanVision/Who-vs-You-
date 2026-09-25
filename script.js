@@ -19,7 +19,7 @@ let state = {
   knockout: [],
   matchLog: [],
   seasons: [],
-  currentStage: 'group',
+  currentStage: 'groups',
   currentKoRound: 'R16',
   pocketbase: null,
   pocketbaseUrl: PB_DEFAULT_URL,
@@ -219,6 +219,7 @@ async function loadAll() {
 function renderAll() {
   updateStatusBar();
   renderPublicView();
+  updatePublicSectionMeta();
   updateDashboard();
   renderMatchLog();
   renderSeasonDropdown();
@@ -286,21 +287,52 @@ function renderRecentActivity() {
 function showView(v) {
   document.getElementById('view-public').classList.toggle('visible', v === 'public');
   document.getElementById('view-admin').classList.toggle('visible', v === 'admin');
-  document.getElementById('nav-public').classList.toggle('active', v === 'public');
-  document.getElementById('nav-admin').classList.toggle('active', v === 'admin');
+  const adminBtn=document.getElementById('nav-admin');
+  if(adminBtn) adminBtn.classList.toggle('active', v === 'admin');
+  if(v === 'public') updatePublicNav();
 }
 function toggleAdmin() {
   const isAdmin = document.getElementById('view-admin').classList.contains('visible');
   showView(isAdmin ? 'public' : 'admin');
 }
-function showStage(s) {
-  state.currentStage = s;
-  ['group','ko','history'].forEach(x => {
-    document.getElementById('stage-' + x).style.display = x === s ? 'block' : 'none';
-    document.getElementById('tab-' + x).classList.toggle('active', x === s);
+function updatePublicNav() {
+  ['groups','fixtures','results','knockout'].forEach(function(section){
+    const el=document.getElementById('nav-'+section);
+    if(el) el.classList.toggle('active', state.currentStage===section && document.getElementById('view-public').classList.contains('visible'));
   });
-  if (s === 'history') renderHistoryView();
-  if (s === 'ko') renderKnockoutView();
+}
+function showPublicSection(section) {
+  state.currentStage=section;
+  showView('public');
+  const map={groups:'stage-group',fixtures:'stage-fixtures',results:'stage-results',knockout:'stage-ko'};
+  Object.keys(map).forEach(function(key){
+    const el=document.getElementById(map[key]);
+    if(el) el.style.display=key===section?'block':'none';
+  });
+  const titles={groups:'Groups',fixtures:'Fixtures',results:'Results',knockout:'Knockout'};
+  const title=document.getElementById('public-section-title');
+  if(title) title.textContent=titles[section]||'Tournament';
+  updatePublicSectionMeta();
+  updatePublicNav();
+  if(section==='fixtures') renderPublicFixtures();
+  if(section==='results') renderPublicResults();
+  if(section==='knockout') renderKnockoutView();
+}
+function showStage(s) {
+  if(s==='group') return showPublicSection('groups');
+  if(s==='ko') return showPublicSection('knockout');
+  if(s==='history') return renderHistoryView();
+}
+function updatePublicSectionMeta() {
+  const el=document.getElementById('public-section-meta');
+  if(!el) return;
+  if(!state.tournament){ el.textContent=''; return; }
+  const total=state.fixtures.filter(function(f){return f.stage==='group';}).length;
+  const played=state.fixtures.filter(function(f){return f.stage==='group' && f.played;}).length;
+  if(state.currentStage==='groups') el.textContent=state.groups.length+' groups';
+  else if(state.currentStage==='fixtures') el.textContent=(total-played)+' upcoming';
+  else if(state.currentStage==='results') el.textContent=played+' completed';
+  else if(state.currentStage==='knockout') el.textContent=state.knockout.length+' matches';
 }
 
 /* ─── FIXED TOURNAMENT LOGO ─── */
@@ -1101,44 +1133,94 @@ function checkChampion() {
 /* ─── PUBLIC RENDER ─── */
 function renderPublicView() {
   updateStatusBar();
-  const hasTournament = !!state.tournament;
-  document.getElementById('stage-tabs').style.display = hasTournament ? 'flex' : 'none';
   renderGroupStage();
+  renderPublicFixtures();
+  renderPublicResults();
   renderKnockoutView();
   checkChampion();
+  showPublicSection(state.currentStage || 'groups');
 }
 
 function renderGroupStage() {
-  const c = document.getElementById('groups-container');
-  if (!state.tournament) { c.innerHTML = '<div class="empty-state"><img class="empty-state-logo tournament-logo" src="tournament-logo.png" alt=""><h3>Tournament setup pending</h3><p>Competition details will appear here once they are published.</p></div>'; return; }
-  if (state.groups.every(g => !g.players || !g.players.length)) { c.innerHTML = '<div class="empty-state"><img class="empty-state-logo tournament-logo" src="tournament-logo.png" alt=""><h3>Groups are being prepared</h3><p>Standings and fixtures will appear here when the draw is complete.</p></div>'; return; }
-  c.innerHTML = '<div class="groups-grid">' + state.groups.map(g => {
-    if (!g.players || !g.players.length) return '';
-    const sorted = getSortedStandings(g.id);
-    const gf = state.fixtures.filter(f => f.group_id === g.id && f.stage === 'group');
-    const maxRound = gf.length ? Math.max(...gf.map(f => f.round||1)) : 0;
-    return `
-    <div class="group-card">
-      <div class="group-header"><span class="group-name">${g.name}</span><span class="group-count">${g.players.length} players</span></div>
-      <div class="group-body">
-        <table class="standings-table" style="margin-top:12px">
-          <thead><tr><th>#</th><th>Player</th><th>P</th><th>GD</th><th>PTS</th></tr></thead>
-          <tbody>${sorted.map((row,i)=>{const isQ=i<getAdvanceCount();return`<tr class="${isQ?'qualified':''}"><td><span class="rank-num">${i+1}</span></td><td><span class="standing-player">${playerAvatarHtml(getPlayer(row.player_id), 'player-avatar tiny')}<span>${row.name}</span></span></td><td>${row.p}</td><td>${row.gd>0?'+':''}${row.gd}</td><td class="pts-col">${row.pts}</td></tr>`}).join('')}</tbody>
-        </table>
-        <div class="q-badge"> Top ${getAdvanceCount()} Advance</div>
-        ${maxRound > 0 ? `<div class="divider"></div><div style="font-family:var(--ff-hud);font-size:9px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Fixtures by Round</div>
-          ${Array.from({length:maxRound},(_,ri)=>{
-            const rm = gf.filter(f=>(f.round||1)===ri+1);
-            return`<div style="margin-bottom:10px"><div style="font-family:var(--ff-hud);font-size:8px;color:var(--muted);letter-spacing:.15em;margin-bottom:5px">ROUND ${ri+1}</div>
-              <div class="fixture-list">${rm.map(f=>`<div class="fixture-card${f.played?' played':''}">
-                ${tournamentLogoHtml()}
-                ${fixturePlayerHtml(f.home, 'left')}
-                <div class="score-zone">${f.played?`<span class="score-shown">${f.home_score}–${f.away_score}</span>`:'<span class="vs-label">VS</span>'}</div>
-                ${fixturePlayerHtml(f.away, 'right')}
-              </div>`).join('')}</div></div>`}).join('')}` : ''}
-      </div>
-    </div>`;
-  }).join('') + '</div>';
+  const c=document.getElementById('groups-container');
+  if(!state.tournament){
+    c.innerHTML='<div class="empty-state"><img class="empty-state-logo tournament-logo" src="tournament-logo.png" alt=""><h3>Tournament setup pending</h3><p>Competition details will appear here once they are published.</p></div>';
+    return;
+  }
+  if(state.groups.every(function(g){return !g.players || !g.players.length;})){
+    c.innerHTML='<div class="empty-state"><img class="empty-state-logo tournament-logo" src="tournament-logo.png" alt=""><h3>Groups are being prepared</h3><p>Standings will appear here when the draw is complete.</p></div>';
+    return;
+  }
+  c.innerHTML='<div class="groups-grid">'+state.groups.map(function(g){
+    if(!g.players || !g.players.length) return '';
+    const sorted=getSortedStandings(g.id);
+    return '<div class="group-card">'+
+      '<div class="group-header"><span class="group-name">'+g.name+'</span><span class="group-count">'+g.players.length+' players</span></div>'+
+      '<div class="group-body"><table class="standings-table">'+
+      '<thead><tr><th>#</th><th>Player</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>PTS</th></tr></thead>'+
+      '<tbody>'+sorted.map(function(row,i){
+        const isQ=i<getAdvanceCount();
+        return '<tr class="'+(isQ?'qualified':'')+'"><td><span class="rank-num">'+(i+1)+'</span></td>'+
+        '<td><span class="standing-player">'+playerAvatarHtml(getPlayer(row.player_id),'player-avatar tiny')+'<span>'+row.name+'</span></span></td>'+
+        '<td>'+row.p+'</td><td>'+row.w+'</td><td>'+row.d+'</td><td>'+row.l+'</td>'+
+        '<td>'+(row.gd>0?'+':'')+row.gd+'</td><td class="pts-col">'+row.pts+'</td></tr>';
+      }).join('')+'</tbody></table>'+
+      '<div class="q-badge">Top '+getAdvanceCount()+' advance</div></div></div>';
+  }).join('')+'</div>';
+}
+
+function renderPublicFixtures() {
+  const c=document.getElementById('public-fixtures-container');
+  if(!c) return;
+  const fixtures=state.fixtures.filter(function(f){return f.stage==='group' && !f.played;});
+  if(!state.tournament || !state.fixtures.length){
+    c.innerHTML='<div class="empty-state"><h3>No fixtures yet</h3><p>Fixtures will appear after the group draw is generated.</p></div>';
+    return;
+  }
+  if(!fixtures.length){
+    c.innerHTML='<div class="empty-state"><h3>Group fixtures completed</h3><p>All scheduled group-stage matches have results.</p></div>';
+    return;
+  }
+  c.innerHTML=state.groups.map(function(g){
+    const matches=fixtures.filter(function(f){return f.group_id===g.id;});
+    if(!matches.length) return '';
+    const rounds=[...new Set(matches.map(function(f){return f.round||1;}))].sort(function(a,b){return a-b;});
+    return '<section class="public-match-group"><div class="public-match-group-head"><h3>'+g.name+'</h3><span>'+matches.length+' remaining</span></div>'+
+      rounds.map(function(round){
+        const rm=matches.filter(function(f){return (f.round||1)===round;});
+        return '<div class="public-round"><div class="public-round-label">Round '+round+'</div><div class="fixture-list">'+
+          rm.map(function(f){
+            return '<div class="fixture-card">'+fixturePlayerHtml(f.home,'left')+
+              '<div class="score-zone"><span class="vs-label">VS</span></div>'+
+              fixturePlayerHtml(f.away,'right')+'</div>';
+          }).join('')+'</div></div>';
+      }).join('')+'</section>';
+  }).join('');
+}
+
+function renderPublicResults() {
+  const c=document.getElementById('public-results-container');
+  if(!c) return;
+  const results=state.fixtures.filter(function(f){return f.stage==='group' && f.played;});
+  if(!results.length){
+    c.innerHTML='<div class="empty-state"><h3>No results yet</h3><p>Completed matches will appear here.</p></div>';
+    return;
+  }
+  c.innerHTML=state.groups.map(function(g){
+    const matches=results.filter(function(f){return f.group_id===g.id;});
+    if(!matches.length) return '';
+    const rounds=[...new Set(matches.map(function(f){return f.round||1;}))].sort(function(a,b){return a-b;});
+    return '<section class="public-match-group"><div class="public-match-group-head"><h3>'+g.name+'</h3><span>'+matches.length+' completed</span></div>'+
+      rounds.map(function(round){
+        const rm=matches.filter(function(f){return (f.round||1)===round;});
+        return '<div class="public-round"><div class="public-round-label">Round '+round+'</div><div class="fixture-list">'+
+          rm.map(function(f){
+            return '<div class="fixture-card played">'+fixturePlayerHtml(f.home,'left')+
+              '<div class="score-zone"><span class="score-shown">'+f.home_score+' – '+f.away_score+'</span></div>'+
+              fixturePlayerHtml(f.away,'right')+'</div>';
+          }).join('')+'</div></div>';
+      }).join('')+'</section>';
+  }).join('');
 }
 
 function renderKnockoutView() {
