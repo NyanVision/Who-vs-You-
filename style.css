@@ -1945,3 +1945,32 @@ body {
   .public-match-group{border-radius:7px}
   .public-round{padding:10px 8px 3px}
 }
+
+
+/* Mobile admin drawer scroll isolation */
+@media (max-width: 900px) {
+  body.admin-drawer-open {
+    position: fixed;
+    left: 0;
+    right: 0;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  body.admin-drawer-open #app-header,
+  body.admin-drawer-open .admin-content {
+    pointer-events: none;
+  }
+
+  body.admin-drawer-open .admin-mobile-menu,
+  body.admin-drawer-open .sidebar {
+    pointer-events: auto;
+  }
+
+  .sidebar {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+}
